@@ -1,0 +1,7 @@
+pch_exportaciones.db
+REPORTE_SEMANAL FILTRADO.xlsx
+PCH_Correlacion_Volumen_Precio.pdf
+ERRORES.pdf
+__pycache__/
+*.pyc
+.env
