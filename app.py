@@ -11,7 +11,7 @@ import streamlit as st
 # ── Configuración ──────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="PCH Global — Queneto",
+    page_title="PCH Global — Reporte Queneto",
     page_icon="🥑",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -90,7 +90,7 @@ df_full = load_data()
 
 with st.sidebar:
     st.markdown(f"<h2 style='color:{VERDE}; margin-top:0'>PCH Global</h2>", unsafe_allow_html=True)
-    st.caption("Queneto — Explorador de Exportaciones")
+    st.caption("Reporte Queneto — Exportaciones Peruanas")
     st.divider()
 
     productos_disp = sorted(df_full["producto"].dropna().unique())
@@ -141,7 +141,7 @@ df = df_full[mask].copy()
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 
-st.markdown(f"<h1 style='margin-bottom:0'>🥑 PCH Global — Exportaciones</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='margin-bottom:0'>PCH Global — Reporte Queneto</h1>", unsafe_allow_html=True)
 filtro_desc = " · ".join(sel_producto) if sel_producto else "Todos los productos"
 años_desc   = " · ".join(str(a) for a in sorted(sel_año)) if sel_año else "Todos los años"
 st.caption(f"{filtro_desc} | {años_desc} | {len(df):,} registros filtrados")
