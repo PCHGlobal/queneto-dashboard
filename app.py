@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Credenciales (Streamlit Cloud secrets → env vars → SQLite) ────────────────
+# ── Credenciales (Streamlit Cloud secrets → env vars) ───────────────────────────
 
 def _secret(key, default=""):
     try:
@@ -27,19 +27,18 @@ SQL_SERVER = _secret("SQL_SERVER_HOST")
 SQL_DB     = _secret("SQL_DATABASE")
 SQL_USER   = _secret("SQL_USER")
 SQL_PASS   = _secret("SQL_PASSWORD")
-USE_AZURE  = bool(SQL_SERVER and SQL_USER and SQL_PASS)
-DB_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "queneto_app.db")
 
-PH = "%s" if USE_AZURE else "?"   # placeholder paramétrico
+if not all([SQL_SERVER, SQL_USER, SQL_PASS]):
+    st.error("⚠️ Credenciales Azure SQL no configuradas. Agrega SQL_SERVER_HOST, SQL_USER y SQL_PASSWORD en Secrets.")
+    st.stop()
+
+PH = "%s"  # pymssql usa %s
 
 def _conn():
-    if USE_AZURE:
-        import pymssql
-        return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
-                               password=SQL_PASS, database=SQL_DB,
-                               tds_version="7.4", timeout=0, login_timeout=30)
-    import sqlite3
-    return sqlite3.connect(DB_PATH)
+    import pymssql
+    return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
+                           password=SQL_PASS, database=SQL_DB,
+                           tds_version="7.4", timeout=0, login_timeout=30)
 
 # ── Estilos ───────────────────────────────────────────────────────────────────
 
@@ -147,10 +146,7 @@ def _opts(col):
 with st.sidebar:
     st.markdown(f"<h2 style='color:{VERDE}; margin-top:0'>PCH Global</h2>", unsafe_allow_html=True)
     st.caption("Reporte Queneto — Exportaciones Peruanas")
-    if USE_AZURE:
-        st.caption("🟢 Azure SQL")
-    else:
-        st.caption("🟡 SQLite local")
+    st.caption("🟢 Azure SQL")
     st.divider()
 
     # Filtros principales
