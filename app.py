@@ -35,10 +35,21 @@ if not all([SQL_SERVER, SQL_USER, SQL_PASS]):
 PH = "%s"  # pymssql usa %s
 
 def _conn():
-    import pymssql
-    return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
-                           password=SQL_PASS, database=SQL_DB,
-                           tds_version="7.4", timeout=0, login_timeout=30)
+    import pymssql, time
+    waits = [15, 30, 45, 60, 90]
+    for attempt, wait in enumerate(waits, 1):
+        try:
+            return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
+                                   password=SQL_PASS, database=SQL_DB,
+                                   tds_version="7.4", timeout=0, login_timeout=30)
+        except Exception as e:
+            if attempt == len(waits):
+                raise
+            code = getattr(e, "args", [None])[0]
+            if code not in (40613, 40615, 42119):
+                raise
+            time.sleep(wait)
+    raise RuntimeError("No se pudo conectar a Azure SQL")
 
 # ── Estilos ───────────────────────────────────────────────────────────────────
 
