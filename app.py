@@ -65,6 +65,11 @@ st.markdown("""
         font-weight: 600; color: #2D6A4F;
     }
     .stTabs [aria-selected="true"] { background: #1B4332 !important; color: white !important; }
+@media print {
+    [data-testid="stSidebar"], [data-testid="stSidebarNav"],
+    [data-testid="collapsedControl"], section[data-testid="stSidebar"] { display: none !important; }
+    .main .block-container { margin-left: 0 !important; max-width: 100% !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
