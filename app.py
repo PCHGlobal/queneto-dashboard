@@ -254,7 +254,7 @@ kpi(c5, "Embarcadores", f"{df['embarcador'].nunique():,}", "distintos")
 # ── Botón imprimir PDF ─────────────────────────────────────────────────────────
 st.components.v1.html("""
 <div style="text-align:right; margin: 4px 0 -8px 0;">
-    <button onclick="window.print()" style="
+    <button onclick="window.parent.print()" style="
         background:#1B4332; color:white; border:none; border-radius:6px;
         padding:8px 20px; font-size:14px; font-weight:600; cursor:pointer;
         display:inline-flex; align-items:center; gap:6px;">
