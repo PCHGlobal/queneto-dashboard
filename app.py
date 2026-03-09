@@ -7,11 +7,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.backends.backend_pdf import PdfPages
 
 st.set_page_config(
     page_title="PCH Global — Reporte Queneto",
@@ -232,6 +227,12 @@ df = load_data(
 # ── Generador PDF ────────────────────────────────────────────────────────────
 
 def generar_pdf(df, prod_desc, años_desc):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    from matplotlib.backends.backend_pdf import PdfPages
+
     buf = io.BytesIO()
     VERDE = "#1B4332"
 
