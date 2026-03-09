@@ -236,6 +236,15 @@ kpi(c5, "Embarcadores", f"{df['embarcador'].nunique():,}", "distintos")
 
 st.divider()
 
+# ── Botón imprimir ────────────────────────────────────────────────────────────
+st.components.v1.html("""
+<button onclick="window.parent.print()" style="
+    background:#1B4332; color:white; border:none; border-radius:6px;
+    padding:8px 20px; font-size:14px; font-weight:600; cursor:pointer;">
+    🖨️ Imprimir / Guardar PDF
+</button>
+""", height=50)
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Gráficos", "📋 Tabla de Datos", "📈 Análisis Semanal", "🏢 Embarcadores"])
