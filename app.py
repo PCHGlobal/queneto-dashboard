@@ -58,6 +58,27 @@ st.markdown("""
     .metric-value { font-size: 24px; color: #1B4332; font-weight: 700; margin-top: 2px; }
     .metric-sub   { font-size: 11px; color: #999; }
     h1, h2, h3 { color: #1B4332 !important; }
+
+    @media print {
+        section[data-testid="stSidebar"],
+        header[data-testid="stHeader"],
+        div[data-testid="stToolbar"],
+        div[data-testid="stDecoration"],
+        div[data-testid="stStatusWidget"],
+        footer,
+        .stButton,
+        .stDownloadButton,
+        button { display: none !important; }
+
+        .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+        .main .block-container { padding-top: 0.5rem !important; }
+        section.main { margin-left: 0 !important; }
+
+        .metric-box { break-inside: avoid; }
+        .stTabs [data-baseweb="tab-panel"] { break-inside: avoid; }
+
+        @page { margin: 1.5cm; size: A4 landscape; }
+    }
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background: #f0faf4; border-radius: 6px 6px 0 0;
@@ -229,6 +250,18 @@ kpi(c2, "Peso Neto", f"{df['peso_neto'].sum()/1e6:,.1f} M kg", f"{df['peso_neto'
 kpi(c3, "FOB Total", f"US$ {df['fob_total'].sum()/1e6:.1f} M", "millones USD")
 kpi(c4, "FOB / kg prom.", f"US$ {df['fob_kg'].mean():.3f}" if len(df) else "—", "USD por kg")
 kpi(c5, "Embarcadores", f"{df['embarcador'].nunique():,}", "distintos")
+
+# ── Botón imprimir PDF ─────────────────────────────────────────────────────────
+st.components.v1.html("""
+<div style="text-align:right; margin: 4px 0 -8px 0;">
+    <button onclick="window.print()" style="
+        background:#1B4332; color:white; border:none; border-radius:6px;
+        padding:8px 20px; font-size:14px; font-weight:600; cursor:pointer;
+        display:inline-flex; align-items:center; gap:6px;">
+        🖨️ Imprimir / Guardar PDF
+    </button>
+</div>
+""", height=48)
 
 st.divider()
 
