@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Credenciales (Streamlit Cloud secrets → env vars) ───────────────────────────
+# ── Credenciales (Streamlit Cloud secrets → env vars → SQLite) ────────────────
 
 def _secret(key, default=""):
     try:
@@ -27,29 +27,19 @@ SQL_SERVER = _secret("SQL_SERVER_HOST")
 SQL_DB     = _secret("SQL_DATABASE")
 SQL_USER   = _secret("SQL_USER")
 SQL_PASS   = _secret("SQL_PASSWORD")
+USE_AZURE  = bool(SQL_SERVER and SQL_USER and SQL_PASS)
+DB_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "queneto_app.db")
 
-if not all([SQL_SERVER, SQL_USER, SQL_PASS]):
-    st.error("⚠️ Credenciales Azure SQL no configuradas. Agrega SQL_SERVER_HOST, SQL_USER y SQL_PASSWORD en Secrets.")
-    st.stop()
-
-PH = "%s"  # pymssql usa %s
+PH = "%s" if USE_AZURE else "?"   # placeholder paramétrico
 
 def _conn():
-    import pymssql, time
-    waits = [15, 30, 45, 60, 90]
-    for attempt, wait in enumerate(waits, 1):
-        try:
-            return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
-                                   password=SQL_PASS, database=SQL_DB,
-                                   tds_version="7.4", timeout=0, login_timeout=30)
-        except Exception as e:
-            if attempt == len(waits):
-                raise
-            code = getattr(e, "args", [None])[0]
-            if code not in (40613, 40615, 42119):
-                raise
-            time.sleep(wait)
-    raise RuntimeError("No se pudo conectar a Azure SQL")
+    if USE_AZURE:
+        import pymssql
+        return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
+                               password=SQL_PASS, database=SQL_DB,
+                               tds_version="7.4", timeout=0, login_timeout=30)
+    import sqlite3
+    return sqlite3.connect(DB_PATH)
 
 # ── Estilos ───────────────────────────────────────────────────────────────────
 
@@ -69,27 +59,6 @@ st.markdown("""
     .metric-value { font-size: 24px; color: #1B4332; font-weight: 700; margin-top: 2px; }
     .metric-sub   { font-size: 11px; color: #999; }
     h1, h2, h3 { color: #1B4332 !important; }
-
-    @media print {
-        section[data-testid="stSidebar"],
-        header[data-testid="stHeader"],
-        div[data-testid="stToolbar"],
-        div[data-testid="stDecoration"],
-        div[data-testid="stStatusWidget"],
-        footer,
-        .stButton,
-        .stDownloadButton,
-        button { display: none !important; }
-
-        .block-container { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
-        .main .block-container { padding-top: 0.5rem !important; }
-        section.main { margin-left: 0 !important; }
-
-        .metric-box { break-inside: avoid; }
-        .stTabs [data-baseweb="tab-panel"] { break-inside: avoid; }
-
-        @page { margin: 1.5cm; size: A4 landscape; }
-    }
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         background: #f0faf4; border-radius: 6px 6px 0 0;
@@ -178,7 +147,10 @@ def _opts(col):
 with st.sidebar:
     st.markdown(f"<h2 style='color:{VERDE}; margin-top:0'>PCH Global</h2>", unsafe_allow_html=True)
     st.caption("Reporte Queneto — Exportaciones Peruanas")
-    st.caption("🟢 Azure SQL")
+    if USE_AZURE:
+        st.caption("🟢 Azure SQL")
+    else:
+        st.caption("🟡 SQLite local")
     st.divider()
 
     # Filtros principales
@@ -235,142 +207,6 @@ df = load_data(
     consignatarios = tuple(sel_consig),
 )
 
-# ── Generador PDF ────────────────────────────────────────────────────────────
-
-def generar_pdf(df, prod_desc, años_desc):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import matplotlib.gridspec as gridspec
-    from matplotlib.backends.backend_pdf import PdfPages
-
-    buf = io.BytesIO()
-    VERDE = "#1B4332"
-
-    with PdfPages(buf) as pdf:
-
-        # ── Página 1: KPIs + Contenedores por semana + FOB por año ──────────
-        fig = plt.figure(figsize=(16, 10))
-        fig.patch.set_facecolor("white")
-        gs = gridspec.GridSpec(3, 2, figure=fig, hspace=0.5, wspace=0.35)
-
-        # Header
-        ax_h = fig.add_subplot(gs[0, :])
-        ax_h.axis("off")
-        ax_h.text(0, 0.85, "PCH Global — Reporte Queneto", fontsize=18, fontweight="bold", color=VERDE)
-        ax_h.text(0, 0.5, f"Producto: {prod_desc}  |  Años: {años_desc}", fontsize=11, color="#444")
-        ax_h.text(0, 0.15,
-            f"Contenedores: {len(df):,}   |   "
-            f"Peso Neto: {df['peso_neto'].sum()/1e6:,.1f} M kg   |   "
-            f"FOB Total: US$ {df['fob_total'].sum()/1e6:.1f} M   |   "
-            f"FOB/kg prom: US$ {df['fob_kg'].mean():.3f}   |   "
-            f"Embarcadores: {df['embarcador'].nunique():,}",
-            fontsize=9, color="#555")
-
-        # Contenedores por semana
-        ax1 = fig.add_subplot(gs[1, 0])
-        df_sem = df.groupby(["anio_src", "semana_src"]).size().reset_index(name="cont")
-        colores = ["#4E9AF1", "#F4A261", "#1ABC9C", "#1B4332", "#9B5DE5", "#E63946"]
-        for i, (año, grp) in enumerate(df_sem.groupby("anio_src")):
-            ax1.plot(grp["semana_src"], grp["cont"], marker="o", markersize=2,
-                     label=str(año), color=colores[i % len(colores)], linewidth=1.5)
-        ax1.set_title("Contenedores por Semana y Año", fontsize=10, fontweight="bold", color=VERDE)
-        ax1.set_xlabel("Semana", fontsize=8); ax1.set_ylabel("Contenedores", fontsize=8)
-        ax1.legend(fontsize=7, ncol=3); ax1.grid(True, alpha=0.3)
-        ax1.tick_params(labelsize=7)
-
-        # FOB por año
-        ax2 = fig.add_subplot(gs[1, 1])
-        df_fob = df.groupby("anio_src")["fob_total"].sum().reset_index()
-        df_fob["fob_M"] = df_fob["fob_total"] / 1e6
-        bars = ax2.bar([str(a) for a in df_fob["anio_src"]], df_fob["fob_M"],
-                       color=colores[:len(df_fob)])
-        for bar, val in zip(bars, df_fob["fob_M"]):
-            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.5,
-                     f"{val:.1f}", ha="center", va="bottom", fontsize=8)
-        ax2.set_title("FOB Total por Año (US$ M)", fontsize=10, fontweight="bold", color=VERDE)
-        ax2.set_ylabel("FOB (US$ M)", fontsize=8); ax2.tick_params(labelsize=8)
-        ax2.grid(True, alpha=0.3, axis="y")
-
-        # FOB/kg por semana
-        ax3 = fig.add_subplot(gs[2, 0])
-        df_fkg = df.groupby(["anio_src", "semana_src"])["fob_kg"].mean().reset_index()
-        for i, (año, grp) in enumerate(df_fkg.groupby("anio_src")):
-            ax3.plot(grp["semana_src"], grp["fob_kg"], marker="o", markersize=2,
-                     label=str(año), color=colores[i % len(colores)], linewidth=1.5)
-        ax3.set_title("FOB/kg promedio por Semana y Año", fontsize=10, fontweight="bold", color=VERDE)
-        ax3.set_xlabel("Semana", fontsize=8); ax3.set_ylabel("USD/kg", fontsize=8)
-        ax3.legend(fontsize=7, ncol=3); ax3.grid(True, alpha=0.3)
-        ax3.tick_params(labelsize=7)
-
-        # Top países
-        ax4 = fig.add_subplot(gs[2, 1])
-        df_p = df.groupby("pais_destino").size().reset_index(name="cont").sort_values("cont").tail(10)
-        ax4.barh(df_p["pais_destino"], df_p["cont"], color="#52B788")
-        ax4.set_title("Top Países Destino", fontsize=10, fontweight="bold", color=VERDE)
-        ax4.tick_params(labelsize=7); ax4.grid(True, alpha=0.3, axis="x")
-
-        pdf.savefig(fig, bbox_inches="tight")
-        plt.close(fig)
-
-        # ── Página 2: Top embarcadores + tabla semana pivote ─────────────────
-        fig2 = plt.figure(figsize=(16, 11))
-        fig2.patch.set_facecolor("white")
-        gs2 = gridspec.GridSpec(2, 2, figure=fig2, hspace=0.5, wspace=0.35)
-
-        # Top embarcadores por contenedores
-        ax5 = fig2.add_subplot(gs2[0, 0])
-        df_emb = df.groupby("embarcador").size().reset_index(name="cont").sort_values("cont").tail(15)
-        ax5.barh(df_emb["embarcador"], df_emb["cont"], color="#F4A261")
-        ax5.set_title("Top Embarcadores", fontsize=10, fontweight="bold", color=VERDE)
-        ax5.tick_params(labelsize=6); ax5.grid(True, alpha=0.3, axis="x")
-
-        # Top embarcadores por FOB
-        ax6 = fig2.add_subplot(gs2[0, 1])
-        df_emb_fob = (df.groupby("embarcador")["fob_total"].sum().reset_index()
-                        .sort_values("fob_total").tail(15))
-        df_emb_fob["fob_M"] = df_emb_fob["fob_total"] / 1e6
-        ax6.barh(df_emb_fob["embarcador"], df_emb_fob["fob_M"], color="#1B4332")
-        ax6.set_title("Top Embarcadores por FOB (US$ M)", fontsize=10, fontweight="bold", color=VERDE)
-        ax6.tick_params(labelsize=6); ax6.grid(True, alpha=0.3, axis="x")
-
-        # Tabla pivote contenedores W01-W52
-        ax7 = fig2.add_subplot(gs2[1, :])
-        ax7.axis("off")
-        ax7.set_title("Contenedores por Semana y Año (W01-W52)", fontsize=10,
-                      fontweight="bold", color=VERDE, pad=10)
-        df_piv = df.groupby(["anio_src", "semana_src"]).size().reset_index(name="cont")
-        pivot = (df_piv.pivot(index="semana_src", columns="anio_src", values="cont")
-                       .reindex(range(1, 53)).fillna(0).astype(int))
-        pivot["TOTAL"] = pivot.sum(axis=1)
-        años_cols = [str(c) for c in pivot.columns]
-        pivot.columns = años_cols
-        # Mostrar solo semanas con datos
-        pivot_datos = pivot[pivot["TOTAL"] > 0]
-        cols_tabla = list(pivot.columns)
-        tabla_data = [[str(idx)] + [str(pivot_datos.loc[idx, c]) if c in pivot_datos.columns else "0"
-                       for c in cols_tabla] for idx in pivot_datos.index]
-        tabla = ax7.table(
-            cellText=tabla_data,
-            colLabels=["Sem"] + cols_tabla,
-            cellLoc="center", loc="center",
-            bbox=[0, 0, 1, 0.95]
-        )
-        tabla.auto_set_font_size(False)
-        tabla.set_fontsize(6)
-        for (r, c), cell in tabla.get_celld().items():
-            if r == 0:
-                cell.set_facecolor("#1B4332")
-                cell.set_text_props(color="white", fontweight="bold")
-            elif r % 2 == 0:
-                cell.set_facecolor("#f0faf4")
-
-        pdf.savefig(fig2, bbox_inches="tight")
-        plt.close(fig2)
-
-    buf.seek(0)
-    return buf.getvalue()
-
 # ── Header ────────────────────────────────────────────────────────────────────
 
 st.markdown("<h1 style='margin-bottom:0'>PCH Global — Reporte Queneto</h1>", unsafe_allow_html=True)
@@ -397,19 +233,6 @@ kpi(c2, "Peso Neto", f"{df['peso_neto'].sum()/1e6:,.1f} M kg", f"{df['peso_neto'
 kpi(c3, "FOB Total", f"US$ {df['fob_total'].sum()/1e6:.1f} M", "millones USD")
 kpi(c4, "FOB / kg prom.", f"US$ {df['fob_kg'].mean():.3f}" if len(df) else "—", "USD por kg")
 kpi(c5, "Embarcadores", f"{df['embarcador'].nunique():,}", "distintos")
-
-# ── Botón descargar PDF ────────────────────────────────────────────────────────
-_col_pdf, _ = st.columns([1, 4])
-with _col_pdf:
-    if not df.empty:
-        pdf_bytes = generar_pdf(df, prod_desc, años_desc)
-        st.download_button(
-            label="📄 Descargar Reporte PDF",
-            data=pdf_bytes,
-            file_name="PCH_Queneto_Reporte.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
 
 st.divider()
 
