@@ -34,10 +34,17 @@ PH = "%s" if USE_AZURE else "?"   # placeholder paramétrico
 
 def _conn():
     if USE_AZURE:
-        import pymssql
-        return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
-                               password=SQL_PASS, database=SQL_DB,
-                               tds_version="7.4", timeout=0, login_timeout=30)
+        import pymssql, time
+        for attempt in range(5):
+            try:
+                return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
+                                       password=SQL_PASS, database=SQL_DB,
+                                       tds_version="7.4", timeout=30, login_timeout=30)
+            except Exception:
+                if attempt < 4:
+                    time.sleep(8)
+                else:
+                    raise
     import sqlite3
     return sqlite3.connect(DB_PATH)
 
