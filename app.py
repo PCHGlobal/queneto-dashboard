@@ -92,7 +92,10 @@ def load_options():
         WHERE anio_src IS NOT NULL
     """
     conn = _conn()
-    df = pd.read_sql(q, conn)
+    cur = conn.cursor()
+    cur.execute(q)
+    cols = [d[0] for d in cur.description]
+    df = pd.DataFrame(cur.fetchall(), columns=cols)
     conn.close()
     return df
 
@@ -139,7 +142,10 @@ def load_data(
         ORDER BY anio_src, semana_src
     """
     conn = _conn()
-    df = pd.read_sql(q, conn, params=params if params else None)
+    cur = conn.cursor()
+    cur.execute(q, tuple(params) if params else ())
+    cols = [d[0] for d in cur.description]
+    df = pd.DataFrame(cur.fetchall(), columns=cols)
     conn.close()
     for col in ("anio_src", "semana_src"):
         df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
