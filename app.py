@@ -39,7 +39,7 @@ def _conn():
             try:
                 return pymssql.connect(server=SQL_SERVER, user=SQL_USER,
                                        password=SQL_PASS, database=SQL_DB,
-                                       tds_version="7.4", timeout=30, login_timeout=30)
+                                       tds_version="7.4", timeout=0, login_timeout=30)
             except Exception:
                 if attempt < 4:
                     time.sleep(8)
