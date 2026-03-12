@@ -53,7 +53,7 @@ def _conn():
 VERDE   = "#1B4332"
 VERDE_C = "#52B788"
 NARANJA = "#F4A261"
-COLORES = ["#4E9AF1", "#F4A261", "#1ABC9C", "#1B4332", "#9B5DE5", "#E63946"]
+COLORES = ["#4E9AF1", "#F4A261", "#1ABC9C", "#FF6B6B", "#9B5DE5", "#E63946"]
 
 st.markdown("""
 <style>
