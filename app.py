@@ -285,11 +285,10 @@ with tab1:
             st.subheader(_titulo_sem)
             if _multi_prod:
                 df_sem = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
-                df_sem["anio_src"] = df_sem["anio_src"].astype(str)
+                df_sem["serie"] = df_sem["producto"].str.split().str[0] + " " + df_sem["anio_src"].astype(str)
                 fig = px.line(df_sem, x="semana_src", y="cont",
-                              color="producto", line_dash="anio_src", markers=True,
-                              labels={"semana_src":"Semana","cont":"Contenedores",
-                                      "producto":"Producto","anio_src":"Año"},
+                              color="serie", markers=True,
+                              labels={"semana_src":"Semana","cont":"Contenedores","serie":""},
                               color_discrete_sequence=COLORES)
             else:
                 df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
@@ -338,11 +337,10 @@ with tab1:
         st.subheader(_titulo_fkg)
         if _multi_prod:
             df_fkg = df.groupby(["producto","anio_src","semana_src"])["fob_kg"].mean().reset_index()
-            df_fkg["anio_src"] = df_fkg["anio_src"].astype(str)
+            df_fkg["serie"] = df_fkg["producto"].str.split().str[0] + " " + df_fkg["anio_src"].astype(str)
             fig5 = px.line(df_fkg, x="semana_src", y="fob_kg",
-                           color="producto", line_dash="anio_src", markers=True,
-                           labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)",
-                                   "producto":"Producto","anio_src":"Año"},
+                           color="serie", markers=True,
+                           labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)","serie":""},
                            color_discrete_sequence=COLORES)
         else:
             df_fkg = df.groupby(["anio_src","semana_src"])["fob_kg"].mean().reset_index()
