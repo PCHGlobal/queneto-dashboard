@@ -80,24 +80,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Opciones para filtros (query ligera, valores distintos) ───────────────────
+# ── Opciones para filtros (tabla lookup pre-calculada) ────────────────────────
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_options():
-    q = """
-        SELECT DISTINCT anio_src, semana_src, mes, producto, variedad,
-               continente, pais_destino, ciudad_destino, embarcador,
-               naviera, transporte, sector, puerto, puerto_destino, consignatorio
-        FROM reporte_pch
-        WHERE anio_src IS NOT NULL
-    """
     conn = _conn()
     cur = conn.cursor()
-    cur.execute(q)
-    cols = [d[0] for d in cur.description]
-    df = pd.DataFrame(cur.fetchall(), columns=cols)
+    cur.execute("SELECT columna, valor FROM reporte_pch_opciones ORDER BY columna, valor")
+    rows = cur.fetchall()
     conn.close()
-    return df
+    from collections import defaultdict
+    data = defaultdict(list)
+    for col, val in rows:
+        data[col].append(val)
+    # Construir DataFrame compatible con el resto del código
+    max_len = max(len(v) for v in data.values())
+    padded = {k: v + [None] * (max_len - len(v)) for k, v in data.items()}
+    return pd.DataFrame(padded)
 
 # ── Carga de datos filtrada en SQL ────────────────────────────────────────────
 
