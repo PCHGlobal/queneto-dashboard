@@ -171,9 +171,12 @@ with st.sidebar:
     st.divider()
 
     # Filtros principales
+    _anos_disponibles = _opts("anio_src")
+    _ano_default = [max(_anos_disponibles)] if _anos_disponibles else []
+
     sel_producto  = st.multiselect("🍎 Producto",    _opts("producto"),   default=["PALTA FRESCO"])
-    sel_año       = st.multiselect("📅 Año",         _opts("anio_src"),   default=list(_opts("anio_src")))
-    sel_continente= st.multiselect("🌍 Continente",  _opts("continente"), default=list(_opts("continente")))
+    sel_año       = st.multiselect("📅 Año",         _anos_disponibles,   default=_ano_default)
+    sel_continente= st.multiselect("🌍 Continente",  _opts("continente"), default=[])
 
     st.divider()
 
