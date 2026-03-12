@@ -280,12 +280,23 @@ with tab1:
         g1, g2 = st.columns(2)
 
         with g1:
-            st.subheader("Contenedores por Semana y Año")
-            df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
-            df_sem["anio_src"] = df_sem["anio_src"].astype(str)
-            fig = px.line(df_sem, x="semana_src", y="cont", color="anio_src", markers=True,
-                          labels={"semana_src":"Semana","cont":"Contenedores","anio_src":"Año"},
-                          color_discrete_sequence=COLORES)
+            _multi_prod = len(sel_producto) > 1
+            _titulo_sem = "Contenedores por Semana y Producto" if _multi_prod else "Contenedores por Semana y Año"
+            st.subheader(_titulo_sem)
+            if _multi_prod:
+                df_sem = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
+                df_sem["anio_src"] = df_sem["anio_src"].astype(str)
+                fig = px.line(df_sem, x="semana_src", y="cont",
+                              color="producto", line_dash="anio_src", markers=True,
+                              labels={"semana_src":"Semana","cont":"Contenedores",
+                                      "producto":"Producto","anio_src":"Año"},
+                              color_discrete_sequence=COLORES)
+            else:
+                df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
+                df_sem["anio_src"] = df_sem["anio_src"].astype(str)
+                fig = px.line(df_sem, x="semana_src", y="cont", color="anio_src", markers=True,
+                              labels={"semana_src":"Semana","cont":"Contenedores","anio_src":"Año"},
+                              color_discrete_sequence=COLORES)
             fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=350)
             st.plotly_chart(fig, use_container_width=True)
 
@@ -323,12 +334,22 @@ with tab1:
             fig4.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=400)
             st.plotly_chart(fig4, use_container_width=True)
 
-        st.subheader("FOB/kg promedio por Semana y Año")
-        df_fkg = df.groupby(["anio_src","semana_src"])["fob_kg"].mean().reset_index()
-        df_fkg["anio_src"] = df_fkg["anio_src"].astype(str)
-        fig5 = px.line(df_fkg, x="semana_src", y="fob_kg", color="anio_src", markers=True,
-                       labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)","anio_src":"Año"},
-                       color_discrete_sequence=COLORES)
+        _titulo_fkg = "FOB/kg promedio por Semana y Producto" if _multi_prod else "FOB/kg promedio por Semana y Año"
+        st.subheader(_titulo_fkg)
+        if _multi_prod:
+            df_fkg = df.groupby(["producto","anio_src","semana_src"])["fob_kg"].mean().reset_index()
+            df_fkg["anio_src"] = df_fkg["anio_src"].astype(str)
+            fig5 = px.line(df_fkg, x="semana_src", y="fob_kg",
+                           color="producto", line_dash="anio_src", markers=True,
+                           labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)",
+                                   "producto":"Producto","anio_src":"Año"},
+                           color_discrete_sequence=COLORES)
+        else:
+            df_fkg = df.groupby(["anio_src","semana_src"])["fob_kg"].mean().reset_index()
+            df_fkg["anio_src"] = df_fkg["anio_src"].astype(str)
+            fig5 = px.line(df_fkg, x="semana_src", y="fob_kg", color="anio_src", markers=True,
+                           labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)","anio_src":"Año"},
+                           color_discrete_sequence=COLORES)
         fig5.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=320)
         st.plotly_chart(fig5, use_container_width=True)
 
