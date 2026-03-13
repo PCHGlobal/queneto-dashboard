@@ -127,8 +127,8 @@ def load_data(
     _add("puerto_destino", puertos_dst)
     _add("consignatorio",  consignatarios)
 
-    conds.append(f"semana_src >= {PH}"); params.append(sem_min)
-    conds.append(f"semana_src <= {PH}"); params.append(sem_max)
+    conds.append(f"(semana_src >= {PH} AND semana_src <= {PH} OR semana_src IS NULL)")
+    params.append(sem_min); params.append(sem_max)
 
     where = " AND ".join(conds) if conds else "1=1"
     q = f"""
