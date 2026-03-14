@@ -28,6 +28,7 @@ SQL_DB     = _secret("SQL_DATABASE")
 SQL_USER   = _secret("SQL_USER")
 SQL_PASS   = _secret("SQL_PASSWORD")
 USE_AZURE  = bool(SQL_SERVER and SQL_USER and SQL_PASS)
+USE_LOCAL  = USE_AZURE  # alias semántico
 DB_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "queneto_app.db")
 
 PH = "%s" if USE_AZURE else "?"   # placeholder paramétrico
@@ -104,7 +105,7 @@ def load_options():
 def load_data(
     productos, años, continentes, sem_min, sem_max,
     meses, paises, embarcadores, navieras, variedades, transportes, sectores,
-    puertos, puertos_dst, consignatarios
+    puertos, puertos_dst, consignatarios, semana_col="semana_zarpe"
 ):
     conds, params = [], []
 
@@ -127,18 +128,18 @@ def load_data(
     _add("puerto_destino", puertos_dst)
     _add("consignatorio",  consignatarios)
 
-    conds.append(f"(semana_src >= {PH} AND semana_src <= {PH} OR semana_src IS NULL)")
+    conds.append(f"({semana_col} >= {PH} AND {semana_col} <= {PH} OR {semana_col} IS NULL)")
     params.append(sem_min); params.append(sem_max)
 
     where = " AND ".join(conds) if conds else "1=1"
     q = f"""
-        SELECT anio_src, semana_src, mes, fecha_zarpe,
+        SELECT anio_src, {semana_col} AS semana_src, mes, fecha_zarpe,
                producto, variedad, continente, pais_destino, ciudad_destino,
                puerto, puerto_destino, naviera, embarcador, consignatorio,
                transporte, sector, fcl, peso_neto, fob_total, fob_kg
         FROM reporte_pch
         WHERE {where}
-        ORDER BY anio_src, semana_src
+        ORDER BY anio_src, {semana_col}
     """
     conn = _conn()
     cur = conn.cursor()
@@ -165,7 +166,7 @@ with st.sidebar:
     st.markdown(f"<h2 style='color:{VERDE}; margin-top:0'>PCH Global</h2>", unsafe_allow_html=True)
     st.caption("Reporte Queneto — Exportaciones Peruanas")
     if USE_AZURE:
-        st.caption("🟢 Azure SQL")
+        st.caption("🟢 SQL Server")
     else:
         st.caption("🟡 SQLite local")
     st.divider()
@@ -198,7 +199,9 @@ with st.sidebar:
         sel_emb       = st.multiselect("Embarcador",      _opts("embarcador"),     default=[])
 
     with st.expander("📆 Período"):
-        sems = sorted(opts["semana_src"].dropna().unique().astype(int))
+        sel_semana_tipo = st.radio("Semana de", ["Zarpe (salida Perú)", "ETA (llegada destino)"], horizontal=True)
+        _sem_col = "semana_zarpe" if "Zarpe" in sel_semana_tipo else "semana_eta"
+        sems = sorted(opts[_sem_col].dropna().unique().astype(int))
         sel_semana = st.slider("Semana", int(min(sems)), int(max(sems)), (int(min(sems)), int(max(sems))))
         sel_mes    = st.multiselect("Mes", _opts("mes"), default=[])
 
@@ -225,6 +228,7 @@ df = load_data(
     puertos      = tuple(sel_puerto),
     puertos_dst  = tuple(sel_puerto_dst),
     consignatarios = tuple(sel_consig),
+    semana_col   = _sem_col,
 )
 
 # ── Header ────────────────────────────────────────────────────────────────────
