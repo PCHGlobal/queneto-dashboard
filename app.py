@@ -213,7 +213,7 @@ with st.sidebar:
         _sem_col = "semana_zarpe" if "ETD" in sel_semana_tipo else "semana_eta"
         sems = sorted(opts[_sem_col].dropna().unique().astype(int))
         sel_semana = st.slider("Semana", int(min(sems)), int(max(sems)), (int(min(sems)), int(max(sems))))
-        sel_mes    = st.multiselect("Mes", _opts("mes"), default=[])
+        sel_mes    = st.multiselect("Mes", sorted(_opts("mes"), key=lambda x: int(x) if str(x).isdigit() else x), default=[])
 
     sel_producto  = st.multiselect("🍎 Producto",    _opts("producto"),   default=["PALTA FRESCO"])
     sel_año       = st.multiselect("📅 Año",         _anos_disponibles,   default=_ano_default)
