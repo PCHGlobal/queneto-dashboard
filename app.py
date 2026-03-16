@@ -291,16 +291,19 @@ with tab1:
                 df_sem = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
                 df_sem["serie"] = df_sem["producto"].str.split().str[0] + " " + df_sem["anio_src"].astype(str)
                 fig = px.line(df_sem, x="semana_src", y="cont",
-                              color="serie", markers=True,
+                              color="serie", markers=True, text="cont",
                               labels={"semana_src":"Semana","cont":"Contenedores","serie":""},
                               color_discrete_sequence=COLORES)
             else:
                 df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
                 df_sem["anio_src"] = df_sem["anio_src"].astype(str)
                 fig = px.line(df_sem, x="semana_src", y="cont", color="anio_src", markers=True,
+                              text="cont",
                               labels={"semana_src":"Semana","cont":"Contenedores","anio_src":"Año"},
                               color_discrete_sequence=COLORES)
-            fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=350)
+            fig.update_traces(textposition="top center", textfont_size=9,
+                              mode="lines+markers+text")
+            fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=380)
             st.plotly_chart(fig, use_container_width=True)
 
         with g2:
@@ -323,6 +326,7 @@ with tab1:
                       .sort_values("cont", ascending=True).tail(15))
             fig3 = px.bar(df_p, x="cont", y="pais_destino", orientation="h",
                           labels={"pais_destino":"","cont":"Contenedores"},
+                          text_auto=".0f",
                           color_discrete_sequence=[VERDE_C])
             fig3.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=400)
             st.plotly_chart(fig3, use_container_width=True)
@@ -333,6 +337,7 @@ with tab1:
                         .sort_values("cont", ascending=True).tail(15))
             fig4 = px.bar(df_nav, x="cont", y="naviera", orientation="h",
                           labels={"naviera":"","cont":"Contenedores"},
+                          text_auto=".0f",
                           color_discrete_sequence=[NARANJA])
             fig4.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=400)
             st.plotly_chart(fig4, use_container_width=True)
@@ -342,17 +347,22 @@ with tab1:
         if _multi_prod:
             df_fkg = df.groupby(["producto","anio_src","semana_src"])["fob_kg"].mean().reset_index()
             df_fkg["serie"] = df_fkg["producto"].str.split().str[0] + " " + df_fkg["anio_src"].astype(str)
+            df_fkg["texto"] = df_fkg["fob_kg"].round(2).astype(str)
             fig5 = px.line(df_fkg, x="semana_src", y="fob_kg",
-                           color="serie", markers=True,
+                           color="serie", markers=True, text="texto",
                            labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)","serie":""},
                            color_discrete_sequence=COLORES)
         else:
             df_fkg = df.groupby(["anio_src","semana_src"])["fob_kg"].mean().reset_index()
             df_fkg["anio_src"] = df_fkg["anio_src"].astype(str)
+            df_fkg["texto"] = df_fkg["fob_kg"].round(2).astype(str)
             fig5 = px.line(df_fkg, x="semana_src", y="fob_kg", color="anio_src", markers=True,
+                           text="texto",
                            labels={"semana_src":"Semana","fob_kg":"FOB/kg (USD)","anio_src":"Año"},
                            color_discrete_sequence=COLORES)
-        fig5.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=320)
+        fig5.update_traces(textposition="top center", textfont_size=9,
+                           mode="lines+markers+text")
+        fig5.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=350)
         st.plotly_chart(fig5, use_container_width=True)
 
         g5, g6 = st.columns(2)
@@ -370,6 +380,7 @@ with tab1:
                         .sort_values("cont", ascending=True).tail(10))
             fig7 = px.bar(df_pto, x="cont", y="puerto", orientation="h",
                           labels={"puerto":"","cont":"Contenedores"},
+                          text_auto=".0f",
                           color_discrete_sequence=["#9B5DE5"])
             fig7.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=320)
             st.plotly_chart(fig7, use_container_width=True)
@@ -450,23 +461,64 @@ with tab3:
     if df.empty:
         st.warning("Sin datos para los filtros seleccionados.")
     else:
-        st.subheader("Contenedores por Semana y Año")
-        df_piv = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
-        pivot = (df_piv.pivot(index="semana_src", columns="anio_src", values="cont")
-                        .reindex(range(1,53)).fillna(0).astype(int))
-        pivot.index.name = "Semana"
-        pivot.columns = [str(c) for c in pivot.columns]
-        pivot["TOTAL"] = pivot.sum(axis=1)
-        año_cols = [c for c in pivot.columns if c != "TOTAL"]
-        styled = (pivot.style
-                  .background_gradient(subset=año_cols, cmap="Greens", axis=None)
-                  .background_gradient(subset=["TOTAL"], cmap="Blues", axis=None))
-        st.dataframe(styled, use_container_width=True, height=600)
+        _multi_prod_t3 = df["producto"].nunique() > 1
+        productos_t3 = sorted(df["producto"].unique()) if _multi_prod_t3 else [None]
 
-        buf_p = io.BytesIO(); pivot.to_excel(buf_p, engine="openpyxl"); buf_p.seek(0)
-        st.download_button("⬇️ Tabla Contenedores Excel", data=buf_p,
-                           file_name="PCH_Contenedores_Semana.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        def _make_pivot(df_src):
+            dp = df_src.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
+            pv = (dp.pivot(index="semana_src", columns="anio_src", values="cont")
+                    .reindex(range(1,53)).fillna(0).astype(int))
+            pv.index.name = "Semana"
+            pv.columns = [str(c) for c in pv.columns]
+            pv["TOTAL"] = pv.sum(axis=1)
+            return pv
+
+        if _multi_prod_t3:
+            # Tabla combinada con columnas por producto+año
+            df_piv_all = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
+            df_piv_all["col"] = df_piv_all["producto"].str.split().str[0] + " " + df_piv_all["anio_src"].astype(str)
+            pivot_wide = (df_piv_all.pivot_table(index="semana_src", columns="col", values="cont", aggfunc="sum")
+                                    .reindex(range(1,53)).fillna(0).astype(int))
+            pivot_wide.index.name = "Semana"
+            pivot_wide["TOTAL"] = pivot_wide.sum(axis=1)
+            st.subheader("Contenedores por Semana y Año — Todos los productos")
+            tot_cols = [c for c in pivot_wide.columns if c != "TOTAL"]
+            styled_wide = (pivot_wide.style
+                           .background_gradient(subset=tot_cols, cmap="Greens", axis=None)
+                           .background_gradient(subset=["TOTAL"], cmap="Blues", axis=None))
+            st.dataframe(styled_wide, use_container_width=True, height=600)
+            buf_all = io.BytesIO(); pivot_wide.to_excel(buf_all, engine="openpyxl"); buf_all.seek(0)
+            st.download_button("⬇️ Excel Todos los productos", data=buf_all,
+                               file_name="PCH_Contenedores_Semana_Productos.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.divider()
+            # Secciones individuales por producto
+            for prod in productos_t3:
+                prod_label = prod.split()[0] if prod else ""
+                st.subheader(f"Contenedores por Semana y Año — {prod_label}")
+                pivot = _make_pivot(df[df["producto"] == prod])
+                año_cols = [c for c in pivot.columns if c != "TOTAL"]
+                styled = (pivot.style
+                          .background_gradient(subset=año_cols, cmap="Greens", axis=None)
+                          .background_gradient(subset=["TOTAL"], cmap="Blues", axis=None))
+                st.dataframe(styled, use_container_width=True, height=400)
+                buf_p = io.BytesIO(); pivot.to_excel(buf_p, engine="openpyxl"); buf_p.seek(0)
+                st.download_button(f"⬇️ Excel {prod_label}", data=buf_p,
+                                   file_name=f"PCH_Contenedores_{prod_label}.xlsx",
+                                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                   key=f"dl_piv_{prod}")
+        else:
+            st.subheader("Contenedores por Semana y Año")
+            pivot = _make_pivot(df)
+            año_cols = [c for c in pivot.columns if c != "TOTAL"]
+            styled = (pivot.style
+                      .background_gradient(subset=año_cols, cmap="Greens", axis=None)
+                      .background_gradient(subset=["TOTAL"], cmap="Blues", axis=None))
+            st.dataframe(styled, use_container_width=True, height=600)
+            buf_p = io.BytesIO(); pivot.to_excel(buf_p, engine="openpyxl"); buf_p.seek(0)
+            st.download_button("⬇️ Tabla Contenedores Excel", data=buf_p,
+                               file_name="PCH_Contenedores_Semana.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         st.divider()
         st.subheader("FOB/kg promedio por Semana y Año")
