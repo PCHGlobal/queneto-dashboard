@@ -628,8 +628,10 @@ with tab4:
                        category_orders={"anio_src": años_orden},
                        color_discrete_sequence=COLORES)
         fig3.update_xaxes(type="category")
-        fig3.update_traces(textposition="top center", textfont_size=9,
-                           mode="lines+markers+text")
+        fig3.update_traces(textfont_size=9, mode="lines+markers+text")
+        _positions = ["top center", "bottom center", "top right", "bottom right", "top left"]
+        for i, trace in enumerate(fig3.data):
+            trace.textposition = _positions[i % len(_positions)]
         _y3_max = df_top5["cont"].max() * 1.2
         fig3.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
                            height=360, title="Evolución Top 5 Embarcadores por Año",
