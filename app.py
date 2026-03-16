@@ -338,7 +338,9 @@ with tab1:
                               color_discrete_sequence=COLORES)
             fig.update_traces(textposition="top center", textfont_size=9,
                               mode="lines+markers+text")
-            fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=380)
+            _y_max = df_sem["cont"].max() * 1.2
+            fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=400,
+                              yaxis=dict(range=[0, _y_max]))
             st.plotly_chart(fig, use_container_width=True)
 
         with g2:
@@ -397,7 +399,9 @@ with tab1:
                            color_discrete_sequence=COLORES)
         fig5.update_traces(textposition="top center", textfont_size=9,
                            mode="lines+markers+text")
-        fig5.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=350)
+        _y5_max = df_fkg["fob_kg"].max() * 1.2
+        fig5.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=350,
+                           yaxis=dict(range=[0, _y5_max]))
         st.plotly_chart(fig5, use_container_width=True)
 
         g5, g6 = st.columns(2)
@@ -626,8 +630,10 @@ with tab4:
         fig3.update_xaxes(type="category")
         fig3.update_traces(textposition="top center", textfont_size=9,
                            mode="lines+markers+text")
+        _y3_max = df_top5["cont"].max() * 1.2
         fig3.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
-                           height=360, title="Evolución Top 5 Embarcadores por Año")
+                           height=360, title="Evolución Top 5 Embarcadores por Año",
+                           yaxis=dict(range=[0, _y3_max]))
         st.plotly_chart(fig3, use_container_width=True)
 
         # Tabla resumen
