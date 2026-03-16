@@ -208,7 +208,7 @@ with st.sidebar:
     _anos_disponibles = _opts("anio_src")
     _ano_default = [max(_anos_disponibles)] if _anos_disponibles else []
 
-    with st.expander("📆 Período", expanded=True):
+    with st.expander("📆 Período"):
         sel_semana_tipo = st.radio("Semana de", ["ETD (salida Perú)", "ETA (llegada destino)"], horizontal=True)
         _sem_col = "semana_zarpe" if "ETD" in sel_semana_tipo else "semana_eta"
         sems = sorted(opts[_sem_col].dropna().unique().astype(int))
