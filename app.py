@@ -240,7 +240,6 @@ with st.sidebar:
             tuple(sel_producto), tuple(sel_año), tuple(sel_continente), tuple(sel_pais)
         )
         sel_ciudad    = st.multiselect("Ciudad destino",  _cas2["ciudad_destino"], default=[])
-        sel_puerto_dst= st.multiselect("Puerto destino",  _cas2["puerto_destino"], default=[])
 
     with st.expander("🚢 Transporte / Origen"):
         sel_naviera   = st.multiselect("Naviera",         _cas["naviera"],        default=[])
@@ -269,7 +268,7 @@ df = load_data(
     transportes  = tuple(sel_transporte),
     sectores     = tuple(sel_sector),
     puertos      = tuple(sel_puerto),
-    puertos_dst  = tuple(sel_puerto_dst),
+    puertos_dst  = (),
     consignatarios = tuple(sel_consig),
     semana_col   = _sem_col,
 )
