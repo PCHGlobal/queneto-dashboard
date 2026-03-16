@@ -102,8 +102,8 @@ def load_options():
 # ── Opciones filtradas en cascada ─────────────────────────────────────────────
 
 @st.cache_data(ttl=300, show_spinner=False)
-def load_cascade_options(productos, años, continentes):
-    """Devuelve opciones de destino/transporte filtradas por los seleccionables primarios."""
+def load_cascade_options(productos, años, continentes, paises=()):
+    """Devuelve opciones de destino/transporte filtradas en cascada."""
     conn = _conn()
     cur = conn.cursor()
     PH = "%s" if USE_AZURE else "?"
@@ -117,6 +117,9 @@ def load_cascade_options(productos, años, continentes):
     if continentes:
         conds.append(f"continente IN ({','.join([PH]*len(continentes))})")
         params.extend(continentes)
+    if paises:
+        conds.append(f"pais_destino IN ({','.join([PH]*len(paises))})")
+        params.extend(paises)
     where = ("WHERE " + " AND ".join(conds)) if conds else ""
     cur.execute(f"""
         SELECT DISTINCT pais_destino, ciudad_destino, puerto_destino,
@@ -224,8 +227,12 @@ with st.sidebar:
 
     with st.expander("🗺️ Destino"):
         sel_pais      = st.multiselect("País destino",    _cas["pais_destino"],   default=[])
-        sel_ciudad    = st.multiselect("Ciudad destino",  _cas["ciudad_destino"], default=[])
-        sel_puerto_dst= st.multiselect("Puerto destino",  _cas["puerto_destino"], default=[])
+        # Re-filtrar ciudades y puertos según el país seleccionado
+        _cas2 = load_cascade_options(
+            tuple(sel_producto), tuple(sel_año), tuple(sel_continente), tuple(sel_pais)
+        )
+        sel_ciudad    = st.multiselect("Ciudad destino",  _cas2["ciudad_destino"], default=[])
+        sel_puerto_dst= st.multiselect("Puerto destino",  _cas2["puerto_destino"], default=[])
 
     with st.expander("🚢 Transporte / Origen"):
         sel_naviera   = st.multiselect("Naviera",         _cas["naviera"],        default=[])
