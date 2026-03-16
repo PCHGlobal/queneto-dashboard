@@ -99,6 +99,36 @@ def load_options():
     padded = {k: v + [None] * (max_len - len(v)) for k, v in data.items()}
     return pd.DataFrame(padded)
 
+# ── Opciones filtradas en cascada ─────────────────────────────────────────────
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_cascade_options(productos, años, continentes):
+    """Devuelve opciones de destino/transporte filtradas por los seleccionables primarios."""
+    conn = _conn()
+    cur = conn.cursor()
+    PH = "%s" if USE_AZURE else "?"
+    conds, params = [], []
+    if productos:
+        conds.append(f"producto IN ({','.join([PH]*len(productos))})")
+        params.extend(productos)
+    if años:
+        conds.append(f"anio_src IN ({','.join([PH]*len(años))})")
+        params.extend(años)
+    if continentes:
+        conds.append(f"continente IN ({','.join([PH]*len(continentes))})")
+        params.extend(continentes)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+    cur.execute(f"""
+        SELECT DISTINCT pais_destino, ciudad_destino, puerto_destino,
+                        naviera, embarcador, consignatorio, puerto, variedad
+        FROM reporte_pch {where}
+    """, params)
+    rows = cur.fetchall()
+    conn.close()
+    cols = ["pais_destino","ciudad_destino","puerto_destino","naviera","embarcador","consignatorio","puerto","variedad"]
+    df_cas = pd.DataFrame(rows, columns=cols)
+    return {c: sorted(df_cas[c].dropna().unique()) for c in cols}
+
 # ── Carga de datos filtrada en SQL ────────────────────────────────────────────
 
 @st.cache_data(ttl=300, show_spinner="Cargando datos…")
@@ -179,24 +209,29 @@ with st.sidebar:
     sel_año       = st.multiselect("📅 Año",         _anos_disponibles,   default=_ano_default)
     sel_continente= st.multiselect("🌍 Continente",  _opts("continente"), default=[])
 
+    # Opciones secundarias filtradas en cascada según primarios
+    _cas = load_cascade_options(
+        tuple(sel_producto), tuple(sel_año), tuple(sel_continente)
+    )
+
     st.divider()
 
     # Filtros secundarios
     with st.expander("📦 Producto / Variedad"):
-        sel_variedad  = st.multiselect("Variedad",    _opts("variedad"),   default=[])
+        sel_variedad  = st.multiselect("Variedad",    _cas["variedad"],    default=[])
         sel_transporte= st.multiselect("Transporte",  _opts("transporte"), default=[])
         sel_sector    = st.multiselect("Sector",      _opts("sector"),     default=[])
 
     with st.expander("🗺️ Destino"):
-        sel_pais      = st.multiselect("País destino",    _opts("pais_destino"),   default=[])
-        sel_ciudad    = st.multiselect("Ciudad destino",  _opts("ciudad_destino"), default=[])
-        sel_puerto_dst= st.multiselect("Puerto destino",  _opts("puerto_destino"), default=[])
+        sel_pais      = st.multiselect("País destino",    _cas["pais_destino"],   default=[])
+        sel_ciudad    = st.multiselect("Ciudad destino",  _cas["ciudad_destino"], default=[])
+        sel_puerto_dst= st.multiselect("Puerto destino",  _cas["puerto_destino"], default=[])
 
     with st.expander("🚢 Transporte / Origen"):
-        sel_naviera   = st.multiselect("Naviera",         _opts("naviera"),        default=[])
-        sel_puerto    = st.multiselect("Puerto origen",   _opts("puerto"),         default=[])
-        sel_consig    = st.multiselect("Consignatario",   _opts("consignatorio"),  default=[])
-        sel_emb       = st.multiselect("Embarcador",      _opts("embarcador"),     default=[])
+        sel_naviera   = st.multiselect("Naviera",         _cas["naviera"],        default=[])
+        sel_puerto    = st.multiselect("Puerto origen",   _cas["puerto"],         default=[])
+        sel_consig    = st.multiselect("Consignatario",   _cas["consignatorio"],  default=[])
+        sel_emb       = st.multiselect("Embarcador",      _cas["embarcador"],     default=[])
 
     with st.expander("📆 Período"):
         sel_semana_tipo = st.radio("Semana de", ["Zarpe (salida Perú)", "ETA (llegada destino)"], horizontal=True)
@@ -582,11 +617,17 @@ with tab4:
         df_top5 = (df[df["embarcador"].isin(top5)]
                      .groupby(["anio_src","embarcador"]).size().reset_index(name="cont"))
         df_top5["anio_src"] = df_top5["anio_src"].astype(str)
+        años_orden = sorted(df_top5["anio_src"].unique())
         fig3 = px.line(df_top5, x="anio_src", y="cont", color="embarcador",
-                       markers=True, labels={"anio_src":"Año","cont":"Contenedores"},
+                       markers=True, text="cont",
+                       labels={"anio_src":"Año","cont":"Contenedores"},
+                       category_orders={"anio_src": años_orden},
                        color_discrete_sequence=COLORES)
+        fig3.update_xaxes(type="category")
+        fig3.update_traces(textposition="top center", textfont_size=9,
+                           mode="lines+markers+text")
         fig3.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
-                           height=320, title="Evolución Top 5 Embarcadores por Año")
+                           height=360, title="Evolución Top 5 Embarcadores por Año")
         st.plotly_chart(fig3, use_container_width=True)
 
         # Tabla resumen
