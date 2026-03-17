@@ -528,49 +528,45 @@ st.divider()
 
 # ── Gráfico histórico + tabla detalle ────────────────────────────────────────
 
-c1, c2 = st.columns([3, 1])
-
 PALETTE = ["#CCCCCC","#AAAACC","#999999","#888888","#F4A261","#52B788","#1B4332"]
 
-with c1:
-    st.markdown("**Evolución histórica — Promedio FOT Hass (€/caja 4kg)**")
-    fig = go.Figure()
-    years_sorted = sorted(df_all["anio"].unique())
-    yr_max = max(years_sorted)
-    for i, yr in enumerate(years_sorted):
-        sub = df_all[df_all["anio"] == yr].dropna(subset=["avg_fot"])
-        is_cur = (yr == yr_max)
-        fig.add_trace(go.Scatter(
-            x=sub["semana"], y=sub["avg_fot"],
-            name=str(yr),
-            mode="lines+markers" if is_cur else "lines",
-            line=dict(
-                color=PALETTE[i % len(PALETTE)],
-                width=3 if is_cur else 1.5,
-                dash="solid" if yr >= 2023 else "dot"
-            ),
-            marker=dict(size=6 if is_cur else 3),
-            hovertemplate=f"{yr} W%{{x}}: €%{{y:.2f}}<extra></extra>"
-        ))
-    fig.update_layout(
-        height=420, plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
-        xaxis=dict(title="Semana", range=[1, 52], dtick=4),
-        yaxis=dict(title="€/caja 4kg", rangemode="tozero"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        hovermode="x unified",
-        margin=dict(t=20, b=40)
-    )
-    st.plotly_chart(fig, use_container_width=True)
+st.markdown("**Evolución histórica — Promedio FOT Hass (€/caja 4kg)**")
+fig = go.Figure()
+years_sorted = sorted(df_all["anio"].unique())
+yr_max = max(years_sorted)
+for i, yr in enumerate(years_sorted):
+    sub = df_all[df_all["anio"] == yr].dropna(subset=["avg_fot"])
+    is_cur = (yr == yr_max)
+    fig.add_trace(go.Scatter(
+        x=sub["semana"], y=sub["avg_fot"],
+        name=str(yr),
+        mode="lines+markers" if is_cur else "lines",
+        line=dict(
+            color=PALETTE[i % len(PALETTE)],
+            width=3 if is_cur else 1.5,
+            dash="solid" if yr >= 2023 else "dot"
+        ),
+        marker=dict(size=6 if is_cur else 3),
+        hovertemplate=f"{yr} W%{{x}}: €%{{y:.2f}}<extra></extra>"
+    ))
+fig.update_layout(
+    height=420, plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
+    xaxis=dict(title="Semana", range=[1, 52], dtick=4),
+    yaxis=dict(title="€/caja 4kg", rangemode="tozero"),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    hovermode="x unified",
+    margin=dict(t=20, b=40)
+)
+st.plotly_chart(fig, use_container_width=True)
 
-with c2:
-    st.markdown(f"**Detalle {yr_max} por grade**")
-    df_show = df_weekly[df_weekly["anio"] == yr_max].copy()
-    df_show = df_show[["semana","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot"]].dropna(subset=["avg_fot"])
-    df_show.columns = ["Sem","Ref 18","12/14","16/18/20","22/24","Avg"]
-    df_show["Sem"] = df_show["Sem"].apply(lambda x: f"W{int(x):02d}")
-    for col in ["Ref 18","12/14","16/18/20","22/24","Avg"]:
-        df_show[col] = df_show[col].apply(lambda x: f"€{x:.2f}" if pd.notna(x) else "—")
-    st.dataframe(df_show.iloc[::-1].reset_index(drop=True), use_container_width=True, height=420)
+st.markdown(f"**Detalle {yr_max} por grade**")
+df_show = df_weekly[df_weekly["anio"] == yr_max].copy()
+df_show = df_show[["semana","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot"]].dropna(subset=["avg_fot"])
+df_show.columns = ["Sem","Ref 18","12/14","16/18/20","22/24","Avg"]
+df_show["Sem"] = df_show["Sem"].apply(lambda x: f"W{int(x):02d}")
+for col in ["Ref 18","12/14","16/18/20","22/24","Avg"]:
+    df_show[col] = df_show[col].apply(lambda x: f"€{x:.2f}" if pd.notna(x) else "—")
+st.dataframe(df_show.iloc[::-1].reset_index(drop=True), use_container_width=True, height=280)
 
 st.divider()
 
