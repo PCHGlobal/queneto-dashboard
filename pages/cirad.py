@@ -79,9 +79,9 @@ with col_nav:
         "<div style='padding-top:14px'>"
         "<a href='/' target='_self' style='"
         "display:block;text-align:center;padding:8px 12px;"
-        "background:#52B788;color:#1B4332 !important;"
+        "background:#1B4332;color:white;"
         "border-radius:6px;text-decoration:none;"
-        "font-weight:700;font-size:0.9rem;border:2px solid #1B4332'>"
+        "font-weight:600;font-size:0.9rem'>"
         "← Queneto</a></div>",
         unsafe_allow_html=True,
     )
