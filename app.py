@@ -664,14 +664,13 @@ with tab5:
 
     @st.cache_data(ttl=3600)
     def load_cirad():
-        with _conn() as c:
-            cur = c.cursor()
-            # Histórico 2020-2025
-            cur.execute("SELECT semana, anio, avg_fot FROM cirad_historical_avg ORDER BY anio, semana")
-            hist = pd.DataFrame(cur.fetchall(), columns=["semana","anio","avg_fot"])
-            # Semanal detallado (con grades)
-            cur.execute("SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224, avg_fot, ata2_eur_kg FROM cirad_weekly_prices ORDER BY anio, semana")
-            weekly = pd.DataFrame(cur.fetchall(), columns=["semana","anio","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot","ata2_eur_kg"])
+        conn = _conn()
+        cur = conn.cursor()
+        cur.execute("SELECT semana, anio, avg_fot FROM cirad_historical_avg ORDER BY anio, semana")
+        hist = pd.DataFrame(cur.fetchall(), columns=["semana","anio","avg_fot"])
+        cur.execute("SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224, avg_fot, ata2_eur_kg FROM cirad_weekly_prices ORDER BY anio, semana")
+        weekly = pd.DataFrame(cur.fetchall(), columns=["semana","anio","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot","ata2_eur_kg"])
+        conn.close()
         return hist, weekly
 
     df_hist, df_weekly = load_cirad()
