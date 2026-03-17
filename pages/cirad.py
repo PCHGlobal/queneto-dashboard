@@ -288,7 +288,7 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
     # ── Comparison table ──────────────────────────────────────────────────────
     elements.append(_p("<b>Precios FOT por Grade — Comparativo Semanal</b>", 10, False, VERDE))
     elements.append(Spacer(1, 3))
-    df_comp = df_weekly.dropna(subset=["avg_fot"]).tail(5)
+    df_comp = df_weekly[df_weekly["anio"] == anio_num].dropna(subset=["avg_fot"])
     hdr_row = ["Semana","Ref Hass 18","Grade 12/14","Grade 16/18/20","Grade 22/24","Grade 26 (€/kg)","Avg FOT","ATA+2 €/kg"]
     rows = [hdr_row]
     for _, r in df_comp.iterrows():
