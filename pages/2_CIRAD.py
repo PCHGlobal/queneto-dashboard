@@ -66,7 +66,8 @@ with col_title:
     st.caption("Aguacate Hass — Precio FOT Mercado Europeo · CIRAD/FruitROP")
 with col_nav:
     st.markdown("<div style='padding-top:12px'>", unsafe_allow_html=True)
-    st.markdown("[← Queneto](./)")
+    if st.button("← Queneto Exportaciones", use_container_width=True):
+        st.switch_page("app.py")
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.divider()
