@@ -73,7 +73,7 @@ st.divider()
 
 # ── Carga de datos ────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)
 def load_cirad():
     try:
         conn = _conn()
