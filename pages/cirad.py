@@ -53,20 +53,38 @@ st.markdown("""
 [data-testid="collapsedControl"] { display: none; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 h1 { color: #1B4332; }
+/* Estilo botón ← Queneto */
+[data-testid="stPageLink"] a {
+    display: block;
+    text-align: center;
+    padding: 8px 12px;
+    background: #1B4332;
+    color: white !important;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+[data-testid="stPageLink"] a:hover { background: #2d6a4f; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Header ────────────────────────────────────────────────────────────────────
 
-col_logo, col_title, col_nav = st.columns([1, 5, 2])
-with col_logo:
-    st.markdown(f"<div style='background:{VERDE};color:white;padding:10px 16px;border-radius:8px;font-size:1.8rem;text-align:center'>🥑</div>", unsafe_allow_html=True)
+col_title, col_nav = st.columns([6, 1])
 with col_title:
-    st.markdown(f"<h1 style='margin:0;padding-top:4px'>PCH GLOBAL — CIRAD</h1>", unsafe_allow_html=True)
-    st.caption("Aguacate Hass — Precio FOT Mercado Europeo · CIRAD/FruitROP")
+    st.markdown(
+        f"<div style='display:flex;align-items:center;gap:14px;margin-top:6px'>"
+        f"<div style='background:{VERDE};color:white;padding:8px 14px;border-radius:8px;"
+        f"font-size:1.8rem;line-height:1;flex-shrink:0;margin-top:2px'>🥑</div>"
+        f"<div><h1 style='margin:0;line-height:1.1'>PCH GLOBAL — CIRAD</h1>"
+        f"<span style='color:#666;font-size:0.85rem'>Aguacate Hass — Precio FOT Mercado Europeo · CIRAD/FruitROP</span></div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 with col_nav:
-    st.markdown("<div style='padding-top:12px'>", unsafe_allow_html=True)
-    st.markdown('<a href="/" target="_self" style="display:block;text-align:center;padding:8px 12px;background:#1B4332;color:white;border-radius:6px;text-decoration:none;font-weight:600;font-size:0.9rem">← Queneto</a>', unsafe_allow_html=True)
+    st.markdown("<div style='padding-top:14px'>", unsafe_allow_html=True)
+    st.page_link("pages/queneto.py", label="← Queneto", use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.divider()
