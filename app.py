@@ -198,7 +198,7 @@ def _opts(col):
 with st.sidebar:
     st.markdown(f"<h2 style='color:{VERDE}; margin-top:0'>PCH Global</h2>", unsafe_allow_html=True)
     st.caption("Reporte Queneto — Exportaciones Peruanas")
-    st.page_link("pages/1_🥑_CIRAD.py", label="🥑 Reporte CIRAD", icon="↗")
+    st.page_link("pages/2_CIRAD.py", label="🥑 Reporte CIRAD")
     st.divider()
     if USE_AZURE:
         st.caption("🟢 SQL Server")
