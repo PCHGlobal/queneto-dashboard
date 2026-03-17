@@ -313,7 +313,7 @@ st.components.v1.html("""
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Gráficos", "📋 Tabla de Datos", "📈 Análisis Semanal", "🏢 Embarcadores"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Gráficos", "📋 Tabla de Datos", "📈 Análisis Semanal", "🏢 Embarcadores", "🥑 Precio FOT"])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Gráficos
@@ -653,3 +653,148 @@ with tab4:
             .head(50),
             use_container_width=True, height=400
         )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — Precio FOT Palta Hass (CIRAD)
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab5:
+    st.markdown("### 🥑 Precio FOT Palta Hass — Mercado Europeo (CIRAD/FruitROP)")
+    st.caption("Precio FOT €/caja 4kg · Promedio grades 12/14 + 16/18/20 + 22/24 · Fuente: CIRAD/FruitROP vía dab")
+
+    @st.cache_data(ttl=3600)
+    def load_cirad():
+        with _conn() as c:
+            cur = c.cursor()
+            # Histórico 2020-2025
+            cur.execute("SELECT semana, anio, avg_fot FROM cirad_historical_avg ORDER BY anio, semana")
+            hist = pd.DataFrame(cur.fetchall(), columns=["semana","anio","avg_fot"])
+            # Semanal detallado (con grades)
+            cur.execute("SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224, avg_fot, ata2_eur_kg FROM cirad_weekly_prices ORDER BY anio, semana")
+            weekly = pd.DataFrame(cur.fetchall(), columns=["semana","anio","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot","ata2_eur_kg"])
+        return hist, weekly
+
+    df_hist, df_weekly = load_cirad()
+
+    if df_hist.empty and df_weekly.empty:
+        st.warning("Sin datos CIRAD disponibles.")
+    else:
+        # ── Indicadores semana más reciente ──────────────────────────────────
+        last = df_weekly.dropna(subset=["avg_fot"]).iloc[-1] if not df_weekly.empty else None
+        prev = df_weekly.dropna(subset=["avg_fot"]).iloc[-2] if len(df_weekly.dropna(subset=["avg_fot"])) > 1 else None
+
+        if last is not None:
+            st.markdown(f"**Semana W{int(last.semana):02d}-{int(last.anio)}** — última actualización")
+            k1, k2, k3, k4, k5 = st.columns(5)
+            def _delta(val, prev_val):
+                if prev_val is None or pd.isna(prev_val): return None
+                return float(val) - float(prev_val)
+
+            k1.metric("Promedio FOT", f"€{last.avg_fot:.2f}" if pd.notna(last.avg_fot) else "—",
+                      f"{_delta(last.avg_fot, prev.avg_fot if prev is not None else None):+.2f}€" if prev is not None and pd.notna(last.avg_fot) else None)
+            k2.metric("Grade 12/14",  f"€{last.fot_1214:.2f}"   if pd.notna(last.fot_1214)   else "—")
+            k3.metric("Grade 16/18/20",f"€{last.fot_161820:.2f}" if pd.notna(last.fot_161820) else "—")
+            k4.metric("Grade 22/24",  f"€{last.fot_2224:.2f}"   if pd.notna(last.fot_2224)   else "—")
+            k5.metric("ATA+2 €/kg",   f"€{last.ata2_eur_kg:.4f}" if pd.notna(last.ata2_eur_kg) else "—")
+
+        st.markdown("---")
+
+        # ── Gráfico histórico por año ─────────────────────────────────────────
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.markdown("**Evolución histórica — Promedio FOT por semana (2020-2026)**")
+            # Unir histórico + semanal detallado para 2026
+            df_h2 = df_hist.copy()
+            weekly_avg = df_weekly[["semana","anio","avg_fot"]].dropna(subset=["avg_fot"])
+            # Años en weekly que no están en hist (2026 por ejemplo)
+            years_weekly = set(weekly_avg["anio"].unique())
+            years_hist   = set(df_h2["anio"].unique())
+            extra = weekly_avg[weekly_avg["anio"].isin(years_weekly - years_hist)]
+            df_all_fot = pd.concat([df_h2, extra], ignore_index=True).sort_values(["anio","semana"])
+
+            fig_hist = go.Figure()
+            years_sorted = sorted(df_all_fot["anio"].unique())
+            palette = ["#BBBBBB","#AAAACC","#9999BB","#888888","#F4A261","#52B788","#1B4332"]
+            for i, yr in enumerate(years_sorted):
+                sub = df_all_fot[df_all_fot["anio"]==yr].dropna(subset=["avg_fot"])
+                is_current = (yr == df_all_fot["anio"].max())
+                fig_hist.add_trace(go.Scatter(
+                    x=sub["semana"], y=sub["avg_fot"],
+                    name=str(yr),
+                    mode="lines+markers" if is_current else "lines",
+                    line=dict(color=palette[i % len(palette)], width=3 if is_current else 1.5,
+                              dash="solid" if is_current else "dot" if yr < 2024 else "solid"),
+                    marker=dict(size=6 if is_current else 3)
+                ))
+            fig_hist.update_layout(
+                height=380, plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
+                xaxis=dict(title="Semana", range=[1,52]),
+                yaxis=dict(title="€/caja 4kg"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                hovermode="x unified"
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
+
+        with c2:
+            st.markdown("**Detalle semanal por grade**")
+            if not df_weekly.empty:
+                df_show = df_weekly[df_weekly["anio"]==df_weekly["anio"].max()].copy()
+                df_show = df_show[["semana","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot"]].dropna(subset=["avg_fot"])
+                df_show.columns = ["Sem","Ref 18","12/14","16/18/20","22/24","Avg FOT"]
+                df_show["Sem"] = df_show["Sem"].apply(lambda x: f"W{int(x):02d}")
+                for col in ["Ref 18","12/14","16/18/20","22/24","Avg FOT"]:
+                    df_show[col] = df_show[col].apply(lambda x: f"€{x:.2f}" if pd.notna(x) else "—")
+                st.dataframe(df_show.iloc[::-1].reset_index(drop=True), use_container_width=True, height=370)
+
+        # ── Correlación Volumen vs FOT (solo Palta → Europa) ─────────────────
+        st.markdown("---")
+        st.markdown("**Correlación: Volumen salida Perú (semana N) → FOT Europa (semana N+3)**")
+        st.caption("Hipótesis: más contenedores saliendo → más oferta en Europa 3 semanas después → precio baja")
+
+        if USE_AZURE and not df.empty:
+            df_palta_eu = df[(df["producto"]=="PALTA FRESCO") & (df["continente"]=="EUROPE")].copy() if "producto" in df.columns else pd.DataFrame()
+            if not df_palta_eu.empty:
+                vol = df_palta_eu.groupby(["anio_src","semana_zarpe"])["fcl"].count().reset_index()
+                vol.columns = ["anio","semana","contenedores"]
+
+                # Cruzar con FOT N+3
+                fot_all = pd.concat([df_hist[["semana","anio","avg_fot"]],
+                                     df_weekly[["semana","anio","avg_fot"]].dropna(subset=["avg_fot"])],
+                                    ignore_index=True).drop_duplicates(["semana","anio"])
+                vol["semana_fot"] = vol["semana"] + 3
+                vol["semana_fot"] = vol["semana_fot"].apply(lambda x: x if x<=52 else x-52)
+                vol["anio_fot"]   = vol.apply(lambda r: r["anio"] if r["semana"]+3<=52 else r["anio"]+1, axis=1)
+                merged = vol.merge(fot_all, left_on=["semana_fot","anio_fot"], right_on=["semana","anio"], how="inner")
+                merged = merged.rename(columns={"semana_x":"semana_zarpe","avg_fot":"fot_n3"})
+
+                if not merged.empty:
+                    fig_corr = go.Figure()
+                    years_c = sorted(merged["anio"].unique())
+                    for i, yr in enumerate(years_c):
+                        sub = merged[merged["anio"]==yr].sort_values("semana_zarpe")
+                        fig_corr.add_trace(go.Bar(
+                            x=sub["semana_zarpe"], y=sub["contenedores"],
+                            name=f"Cont. {yr}", yaxis="y",
+                            marker_color=palette[i % len(palette)], opacity=0.7
+                        ))
+                        fig_corr.add_trace(go.Scatter(
+                            x=sub["semana_zarpe"], y=sub["fot_n3"],
+                            name=f"FOT N+3 {yr}", yaxis="y2",
+                            mode="lines", line=dict(width=2, color=palette[i % len(palette)])
+                        ))
+                    fig_corr.update_layout(
+                        height=400, plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
+                        barmode="group",
+                        xaxis=dict(title="Semana zarpe"),
+                        yaxis=dict(title="Contenedores", side="left"),
+                        yaxis2=dict(title="FOT €/caja N+3", side="right", overlaying="y"),
+                        hovermode="x unified",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02)
+                    )
+                    st.plotly_chart(fig_corr, use_container_width=True)
+                else:
+                    st.info("Sin semanas cruzadas entre volumen y precios CIRAD para los filtros actuales.")
+            else:
+                st.info("Filtra por Palta Fresco + Europa en el sidebar para ver la correlación.")
+        else:
+            st.info("Selecciona Palta Fresco + Europa en los filtros del sidebar para ver la correlación volumen-precio.")
