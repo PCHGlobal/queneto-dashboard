@@ -99,7 +99,7 @@ def load_cirad():
         hist = pd.DataFrame(cur.fetchall(), columns=["semana", "anio", "avg_fot"])
         cur.execute("""SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224,
                               fot_26_kg, avg_fot, ata2_eur_kg
-                       FROM cirad_weekly_prices ORDER BY anio, semana""")
+                       FROM cirad_weekly_prices WHERE anio >= 2026 ORDER BY anio, semana""")
         weekly = pd.DataFrame(cur.fetchall(),
                                columns=["semana","anio","ref_hass_18","fot_1214",
                                         "fot_161820","fot_2224","fot_26_kg","avg_fot","ata2_eur_kg"])
