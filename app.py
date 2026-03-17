@@ -664,17 +664,24 @@ with tab5:
 
     @st.cache_data(ttl=3600)
     def load_cirad():
-        conn = _conn()
-        cur = conn.cursor()
-        cur.execute("SELECT semana, anio, avg_fot FROM cirad_historical_avg ORDER BY anio, semana")
-        hist = pd.DataFrame(cur.fetchall(), columns=["semana","anio","avg_fot"])
-        cur.execute("SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224, avg_fot, ata2_eur_kg FROM cirad_weekly_prices ORDER BY anio, semana")
-        weekly = pd.DataFrame(cur.fetchall(), columns=["semana","anio","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot","ata2_eur_kg"])
-        conn.close()
-        return hist, weekly
+        try:
+            conn = _conn()
+            cur = conn.cursor()
+            cur.execute("SELECT semana, anio, avg_fot FROM cirad_historical_avg ORDER BY anio, semana")
+            hist = pd.DataFrame(cur.fetchall(), columns=["semana","anio","avg_fot"])
+            cur.execute("SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224, avg_fot, ata2_eur_kg FROM cirad_weekly_prices ORDER BY anio, semana")
+            weekly = pd.DataFrame(cur.fetchall(), columns=["semana","anio","ref_hass_18","fot_1214","fot_161820","fot_2224","avg_fot","ata2_eur_kg"])
+            conn.close()
+            return hist, weekly, None
+        except Exception as e:
+            return pd.DataFrame(), pd.DataFrame(), str(e)
 
-    df_hist, df_weekly = load_cirad()
+    df_hist, df_weekly, cirad_err = load_cirad()
 
+    if cirad_err:
+        st.error(f"Error cargando datos CIRAD: {cirad_err}")
+        st.info(f"Servidor SQL configurado: `{SQL_SERVER}` — base de datos: `{SQL_DB}`\n\nLas tablas `cirad_weekly_prices` y `cirad_historical_avg` deben existir en ese servidor.")
+        st.stop()
     if df_hist.empty and df_weekly.empty:
         st.warning("Sin datos CIRAD disponibles.")
     else:
