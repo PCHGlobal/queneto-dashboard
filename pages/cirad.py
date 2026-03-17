@@ -58,19 +58,6 @@ st.markdown("""
 [data-testid="collapsedControl"] { display: none; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 h1 { color: #1B4332; }
-/* Estilo botón ← Queneto */
-[data-testid="stPageLink"] a {
-    display: block;
-    text-align: center;
-    padding: 8px 12px;
-    background: #1B4332;
-    color: white !important;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.9rem;
-}
-[data-testid="stPageLink"] a:hover { background: #2d6a4f; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -88,9 +75,16 @@ with col_title:
         unsafe_allow_html=True,
     )
 with col_nav:
-    st.markdown("<div style='padding-top:14px'>", unsafe_allow_html=True)
-    st.page_link("pages/queneto.py", label="← Queneto", use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div style='padding-top:14px'>"
+        "<a href='/' target='_self' style='"
+        "display:block;text-align:center;padding:8px 12px;"
+        "background:#52B788;color:#1B4332 !important;"
+        "border-radius:6px;text-decoration:none;"
+        "font-weight:700;font-size:0.9rem;border:2px solid #1B4332'>"
+        "← Queneto</a></div>",
+        unsafe_allow_html=True,
+    )
 
 st.divider()
 
