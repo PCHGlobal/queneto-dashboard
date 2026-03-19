@@ -98,11 +98,11 @@ def load_cirad():
         cur.execute("SELECT semana, anio, avg_fot FROM cirad_historical_avg ORDER BY anio, semana")
         hist = pd.DataFrame(cur.fetchall(), columns=["semana", "anio", "avg_fot"])
         cur.execute("""SELECT semana, anio, ref_hass_18, fot_1214, fot_161820, fot_2224,
-                              fot_26_kg, avg_fot, ata2_eur_kg
+                              fot_26_kg, avg_fot
                        FROM cirad_weekly_prices WHERE anio >= 2026 ORDER BY anio, semana""")
         weekly = pd.DataFrame(cur.fetchall(),
                                columns=["semana","anio","ref_hass_18","fot_1214",
-                                        "fot_161820","fot_2224","fot_26_kg","avg_fot","ata2_eur_kg"])
+                                        "fot_161820","fot_2224","fot_26_kg","avg_fot"])
         conn.close()
         return hist, weekly, None
     except Exception as e:
@@ -195,8 +195,8 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
     # ── Week banner ───────────────────────────────────────────────────────────
     ref_str = (f"Referencia Hass Grade 18: <b>€{last.ref_hass_18:.2f}/caja</b>"
                if last is not None and pd.notna(last.ref_hass_18) else "")
-    ata_str = (f"ATA+2 semana actual:<br/><b>€{last.ata2_eur_kg:.4f}/kg</b>"
-               if last is not None and pd.notna(last.ata2_eur_kg) else "")
+    ata_str = (f"Promedio FOT CIRAD:<br/><b>€{last.avg_fot:.2f}/caja</b>"
+               if last is not None and pd.notna(last.avg_fot) else "")
     banner = Table([[
         _p(f"<b>SEMANA {sem_num:02d} — {anio_num}</b>", 13, False, C.white),
         _p(ref_str, 10, False, C.white),
@@ -231,8 +231,7 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
         ("FOT Grade 16/18/20",   *_kv("fot_161820")),
         ("FOT Grade 22/24",      *_kv("fot_2224")),
         ("FOT Grade 26",         *_kv("fot_26_kg", "/kg")),
-        ("Promedio FOT (12-24)", *_kv("avg_fot")),
-        ("ATA+2 €/kg",           *_kv("ata2_eur_kg", "/kg")),
+        ("Promedio FOT CIRAD",   *_kv("avg_fot")),
     ]
 
     def _kpi_cell(label, val, delta):
@@ -289,7 +288,7 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
     elements.append(_p("<b>Precios FOT por Grade — Comparativo Semanal</b>", 10, False, VERDE))
     elements.append(Spacer(1, 3))
     df_comp = df_weekly[df_weekly["anio"] == anio_num].dropna(subset=["avg_fot"])
-    hdr_row = ["Semana","Ref Hass 18","Grade 12/14","Grade 16/18/20","Grade 22/24","Grade 26 (€/kg)","Avg FOT","ATA+2 €/kg"]
+    hdr_row = ["Semana","Ref Hass 18","Grade 12/14","Grade 16/18/20","Grade 22/24","Grade 26 (€/kg)","Avg FOT CIRAD"]
     rows = [hdr_row]
     for _, r in df_comp.iterrows():
         is_last = (last is not None and r.semana == last.semana and r.anio == last.anio)
@@ -301,10 +300,9 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
             f"€{r.fot_2224:.2f}"     if pd.notna(r.fot_2224)     else "—",
             f"€{r.fot_26_kg:.2f}"    if pd.notna(r.fot_26_kg)    else "—",
             f"€{r.avg_fot:.2f}"      if pd.notna(r.avg_fot)      else "—",
-            f"€{r.ata2_eur_kg:.4f}"  if pd.notna(r.ata2_eur_kg)  else "—",
         ])
-    cw8 = cw / 8
-    ctbl = Table(rows, colWidths=[cw8*1.3] + [cw8*0.957]*7)
+    cw7 = cw / 7
+    ctbl = Table(rows, colWidths=[cw7*1.3] + [cw7*0.95]*6)
     ctbl.setStyle(TableStyle([
         ("BACKGROUND",   (0,0), (-1,0), VERDE),
         ("TEXTCOLOR",    (0,0), (-1,0), C.white),
@@ -370,24 +368,24 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
     elements.append(hdr2)
     elements.append(Spacer(1, 10))
 
-    # ── ATA+2 trend ───────────────────────────────────────────────────────────
+    # ── Avg FOT trend ─────────────────────────────────────────────────────────
     yr_max_w  = int(df_weekly["anio"].max())
     yr_prev_w = yr_max_w - 1
-    elements.append(_p(f"<b>Tendencia ATA+2 — {yr_prev_w} a {yr_max_w} (€/kg)</b>", 10, False, VERDE))
+    elements.append(_p(f"<b>Tendencia Promedio FOT CIRAD — {yr_prev_w} a {yr_max_w} (€/caja)</b>", 10, False, VERDE))
     elements.append(Spacer(1, 3))
     fig3, ax3 = plt.subplots(figsize=(12, 2.8))
     for yr, color, lw in [(yr_prev_w, "#52B788", 1.5), (yr_max_w, "#1B4332", 2.5)]:
-        sub = df_weekly[df_weekly["anio"]==yr].dropna(subset=["ata2_eur_kg"]).sort_values("semana")
+        sub = df_weekly[df_weekly["anio"]==yr].dropna(subset=["avg_fot"]).sort_values("semana")
         if not sub.empty:
-            ax3.plot(sub["semana"], sub["ata2_eur_kg"], color=color, lw=lw,
-                     marker="o", ms=4, label=f"ATA+2 € {yr}")
+            ax3.plot(sub["semana"], sub["avg_fot"], color=color, lw=lw,
+                     marker="o", ms=4, label=f"Avg FOT € {yr}")
             for _, r in sub.iterrows():
-                ax3.annotate(f"{r.ata2_eur_kg:.3f}", (r.semana, r.ata2_eur_kg),
+                ax3.annotate(f"{r.avg_fot:.2f}", (r.semana, r.avg_fot),
                              textcoords="offset points", xytext=(0, 5),
                              fontsize=6, ha="center")
     ax3.set_xlim(1, 52)
     ax3.set_xlabel(f"Semana {yr_prev_w} → {yr_max_w}", fontsize=8)
-    ax3.set_ylabel("ATA+2 (€/kg)", fontsize=8)
+    ax3.set_ylabel("Avg FOT CIRAD (€/caja)", fontsize=8)
     ax3.legend(fontsize=7); ax3.grid(True, alpha=0.3)
     ax3.set_facecolor("#FAFAFA"); fig3.patch.set_facecolor("white")
     ax3.tick_params(labelsize=7); fig3.tight_layout(pad=0.5)
@@ -464,7 +462,6 @@ def generate_cirad_pdf(df_weekly, df_hist, df_all, last, prev):
     today = datetime.date.today().strftime("%d %b %Y")
     elements.append(_p(
         "Fuente: CIRAD/FruitROP — Datos: Excel histórico 2020-2025 + PDFs semanas recientes | "
-        "ATA+2: Precio FOT semana N+2 ÷ 4 kg promedio grades 12-24 + grade 26. "
         "Perú destacado como mercado clave PCH.",
         6.5, False, C.HexColor("#555555")))
     elements.append(Spacer(1, 3))
@@ -481,7 +478,7 @@ if last is not None:
     sem_label = f"W{int(last.semana):02d} — {int(last.anio)}"
     st.markdown(f"### Semana {sem_label}")
 
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    k1, k2, k3, k4, k5 = st.columns(5)
 
     def _delta(cur_val, prev_val):
         if prev is None or pd.isna(prev_val) or pd.isna(cur_val):
@@ -501,12 +498,9 @@ if last is not None:
     k4.metric("Grade 22/24",
               f"€{last.fot_2224:.2f}" if pd.notna(last.fot_2224) else "—",
               _delta(last.fot_2224, prev.fot_2224 if prev is not None else None))
-    k5.metric("Promedio FOT",
+    k5.metric("Promedio FOT CIRAD",
               f"€{last.avg_fot:.2f}" if pd.notna(last.avg_fot) else "—",
               _delta(last.avg_fot, prev.avg_fot if prev is not None else None))
-    k6.metric("ATA+2 €/kg",
-              f"€{last.ata2_eur_kg:.4f}" if pd.notna(last.ata2_eur_kg) else "—",
-              _delta(last.ata2_eur_kg, prev.ata2_eur_kg if prev is not None else None))
 
 st.divider()
 
@@ -606,3 +600,4 @@ st.caption("🟢 Alto >€11 · 🔵 Medio-alto €9-11 · 🟡 Medio €7-9 · 
 
 st.markdown("---")
 st.caption("Fuente: CIRAD/FruitROP · Solo Palta Hass · Tránsito Perú→Europa: 20 días ≈ 3 semanas · PCH Global Operations")
+
