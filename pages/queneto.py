@@ -132,6 +132,24 @@ def load_cascade_options(productos, años, continentes, paises=()):
     df_cas = pd.DataFrame(rows, columns=cols)
     return {c: sorted(df_cas[c].dropna().unique()) for c in cols}
 
+# ── CIRAD prices loader ───────────────────────────────────────────────────────
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_cirad_prices(años=()):
+    conn = _conn()
+    cur = conn.cursor()
+    PH_c = "%s" if USE_AZURE else "?"
+    if años:
+        q = f"SELECT semana, anio, avg_fot FROM cirad_weekly_prices WHERE anio IN ({','.join([PH_c]*len(años))}) ORDER BY anio, semana"
+        cur.execute(q, tuple(años))
+    else:
+        cur.execute("SELECT semana, anio, avg_fot FROM cirad_weekly_prices ORDER BY anio, semana")
+    cols = [d[0] for d in cur.description]
+    df_c = pd.DataFrame(cur.fetchall(), columns=cols)
+    conn.close()
+    df_c["avg_fot"] = pd.to_numeric(df_c["avg_fot"], errors="coerce")
+    return df_c
+
 # ── Carga de datos filtrada en SQL ────────────────────────────────────────────
 
 @st.cache_data(ttl=300, show_spinner="Cargando datos…")
@@ -325,44 +343,61 @@ with tab1:
     if df.empty:
         st.warning("Sin datos para los filtros seleccionados.")
     else:
-        g1, g2 = st.columns(2)
+        _multi_prod = len(sel_producto) > 1
+        _titulo_sem = "Contenedores por Semana y Producto" if _multi_prod else "Contenedores por Semana y Año"
+        st.subheader(_titulo_sem)
+        if _multi_prod:
+            df_sem = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
+            df_sem["serie"] = df_sem["producto"].str.split().str[0] + " " + df_sem["anio_src"].astype(str)
+            fig = px.line(df_sem, x="semana_src", y="cont",
+                          color="serie", markers=True, text="cont",
+                          labels={"semana_src":"Semana","cont":"Contenedores","serie":""},
+                          color_discrete_sequence=COLORES)
+        else:
+            df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
+            df_sem["anio_src"] = df_sem["anio_src"].astype(str)
+            fig = px.line(df_sem, x="semana_src", y="cont", color="anio_src", markers=True,
+                          text="cont",
+                          labels={"semana_src":"Semana","cont":"Contenedores","anio_src":"Año"},
+                          color_discrete_sequence=COLORES)
+        fig.update_traces(textposition="top center", textfont_size=9,
+                          mode="lines+markers+text")
+        _y_max = df_sem["cont"].max() * 1.2
+        fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=420,
+                          yaxis=dict(range=[0, _y_max]))
 
-        with g1:
-            _multi_prod = len(sel_producto) > 1
-            _titulo_sem = "Contenedores por Semana y Producto" if _multi_prod else "Contenedores por Semana y Año"
-            st.subheader(_titulo_sem)
-            if _multi_prod:
-                df_sem = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
-                df_sem["serie"] = df_sem["producto"].str.split().str[0] + " " + df_sem["anio_src"].astype(str)
-                fig = px.line(df_sem, x="semana_src", y="cont",
-                              color="serie", markers=True, text="cont",
-                              labels={"semana_src":"Semana","cont":"Contenedores","serie":""},
-                              color_discrete_sequence=COLORES)
-            else:
-                df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
-                df_sem["anio_src"] = df_sem["anio_src"].astype(str)
-                fig = px.line(df_sem, x="semana_src", y="cont", color="anio_src", markers=True,
-                              text="cont",
-                              labels={"semana_src":"Semana","cont":"Contenedores","anio_src":"Año"},
-                              color_discrete_sequence=COLORES)
-            fig.update_traces(textposition="top center", textfont_size=9,
-                              mode="lines+markers+text")
-            _y_max = df_sem["cont"].max() * 1.2
-            fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=400,
-                              yaxis=dict(range=[0, _y_max]))
-            st.plotly_chart(fig, use_container_width=True)
-
-        with g2:
-            st.subheader("FOB Total por Año (US$ M)")
-            df_fob = df.groupby("anio_src")["fob_total"].sum().reset_index()
-            df_fob["fob_M"] = df_fob["fob_total"] / 1e6
-            df_fob["anio_src"] = df_fob["anio_src"].astype(str)
-            fig2 = px.bar(df_fob, x="anio_src", y="fob_M",
-                          labels={"anio_src":"Año","fob_M":"FOB (US$ M)"},
-                          color="anio_src", color_discrete_sequence=COLORES, text_auto=".1f")
-            fig2.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
-                               showlegend=False, height=350)
-            st.plotly_chart(fig2, use_container_width=True)
+        # CIRAD overlay: solo si ETA y producto es palta
+        _show_cirad = (
+            "ETA" in sel_semana_tipo
+            and bool(sel_producto)
+            and all("palta" in p.lower() for p in sel_producto)
+        )
+        if _show_cirad:
+            _cirad_años = tuple(sorted(int(a) for a in sel_año)) if sel_año else ()
+            df_cirad = load_cirad_prices(_cirad_años)
+            if not df_cirad.empty:
+                _cirad_colors = ["#E63946", "#9B5DE5", "#F4A261", "#1ABC9C", "#FF6B6B"]
+                for _i, _anio_c in enumerate(sorted(df_cirad["anio"].unique())):
+                    _dc = df_cirad[df_cirad["anio"] == _anio_c].sort_values("semana")
+                    fig.add_trace(go.Scatter(
+                        x=_dc["semana"], y=_dc["avg_fot"],
+                        name=f"CIRAD {_anio_c} (€/caja)",
+                        mode="lines+markers",
+                        yaxis="y2",
+                        line=dict(dash="dash", width=2,
+                                  color=_cirad_colors[_i % len(_cirad_colors)]),
+                        marker=dict(size=5),
+                    ))
+                fig.update_layout(
+                    yaxis2=dict(
+                        title="Precio CIRAD (€/caja)",
+                        overlaying="y",
+                        side="right",
+                        showgrid=False,
+                        tickformat=".2f",
+                    )
+                )
+        st.plotly_chart(fig, use_container_width=True)
 
         g3, g4 = st.columns(2)
 
@@ -432,6 +467,17 @@ with tab1:
                           color_discrete_sequence=["#9B5DE5"])
             fig7.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=320)
             st.plotly_chart(fig7, use_container_width=True)
+
+        st.subheader("FOB Total por Año (US$ M)")
+        df_fob_año = df.groupby("anio_src")["fob_total"].sum().reset_index()
+        df_fob_año["fob_M"] = df_fob_año["fob_total"] / 1e6
+        df_fob_año["anio_src"] = df_fob_año["anio_src"].astype(str)
+        fig_fob = px.bar(df_fob_año, x="anio_src", y="fob_M",
+                         labels={"anio_src":"Año","fob_M":"FOB (US$ M)"},
+                         color="anio_src", color_discrete_sequence=COLORES, text_auto=".1f")
+        fig_fob.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA",
+                              showlegend=False, height=350)
+        st.plotly_chart(fig_fob, use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — Tabla de Datos
