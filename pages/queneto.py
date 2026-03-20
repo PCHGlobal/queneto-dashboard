@@ -842,10 +842,38 @@ with tab5:
             pivot_mat["TOTAL"] = pivot_mat.sum(axis=1)
             pivot_mat = pivot_mat.sort_values("TOTAL", ascending=False)
             sem_cols = [c for c in pivot_mat.columns if c != "TOTAL"]
-            styled_mat = (pivot_mat.style
-                          .background_gradient(subset=sem_cols, cmap="YlGn", axis=None)
-                          .background_gradient(subset=["TOTAL"], cmap="Blues", axis=None))
-            st.dataframe(styled_mat, use_container_width=True, height=500)
+
+            # Calcular max por columna para intensidad de color (verde)
+            col_max = {c: pivot_mat[c].max() or 1 for c in sem_cols}
+            tot_max = pivot_mat["TOTAL"].max() or 1
+
+            def _bg_green(val, mx):
+                if val == 0: return "background:#fff"
+                pct = val / mx
+                g = int(180 + (1 - pct) * 70)
+                return f"background:rgb({int(200*(1-pct))},{g},{int(180*(1-pct))})"
+
+            def _bg_blue(val):
+                if val == 0: return "background:#fff"
+                pct = val / tot_max
+                return f"background:rgb({int(200*(1-pct))},{int(200*(1-pct))},{int(240 - 60*pct)})"
+
+            mat_headers = "".join(f"<th style='text-align:right'>{c}</th>" for c in sem_cols) + "<th style='text-align:right'>TOTAL</th>"
+            mat_rows = ""
+            for emb, row in pivot_mat.iterrows():
+                cells = "".join(
+                    f"<td style='text-align:right;{_bg_green(row[c], col_max[c])}'>{row[c] if row[c] else ''}</td>"
+                    for c in sem_cols
+                )
+                cells += f"<td style='text-align:right;font-weight:600;{_bg_blue(row[\"TOTAL\"])}'>{row['TOTAL']}</td>"
+                mat_rows += f"<tr><td>{emb}</td>{cells}</tr>"
+
+            st.markdown(f"""
+            <table class="print-table">
+              <thead><tr><th>Embarcador</th>{mat_headers}</tr></thead>
+              <tbody>{mat_rows}</tbody>
+            </table>""", unsafe_allow_html=True)
+
             buf_mat = io.BytesIO()
             pivot_mat.to_excel(buf_mat, engine="openpyxl")
             buf_mat.seek(0)
