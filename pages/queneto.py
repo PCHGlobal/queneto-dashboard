@@ -77,7 +77,16 @@ st.markdown("""
     [data-testid="stSidebar"], [data-testid="stSidebarNav"],
     [data-testid="collapsedControl"], section[data-testid="stSidebar"] { display: none !important; }
     .main .block-container { margin-left: 0 !important; max-width: 100% !important; }
+    .print-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    .print-table th { background: #1B4332 !important; color: white !important; padding: 4px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-table td { padding: 3px 6px; border-bottom: 1px solid #ddd; }
+    .print-table tr:nth-child(even) td { background: #f5f5f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.print-table th { background: #1B4332; color: white; padding: 6px 8px; text-align: left; }
+.print-table td { padding: 4px 8px; border-bottom: 1px solid #e0e0e0; }
+.print-table tr:nth-child(even) td { background: #f5faf7; }
+.print-table tr:hover td { background: #e8f5ee; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -739,42 +748,53 @@ with tab5:
             en_ambas = sorted(set_a & set_b)    # cargaron en ambas
             solo_b   = sorted(set_b - set_a)    # nuevos en B
 
+            # Preparar DataFrames
+            rows_a = [{"Embarcador": e, f"FCL S{sem_a}": emb_a[e]} for e in solo_a]
+            df_a  = pd.DataFrame(rows_a).sort_values(f"FCL S{sem_a}", ascending=False) if rows_a else pd.DataFrame()
+
+            rows_ab = [{"Embarcador": e, f"FCL S{sem_a}": emb_a[e],
+                        f"FCL S{sem_b}": emb_b[e], "Δ FCL": emb_b[e] - emb_a[e]}
+                       for e in en_ambas]
+            df_ab = pd.DataFrame(rows_ab).sort_values(f"FCL S{sem_b}", ascending=False) if rows_ab else pd.DataFrame()
+
+            rows_b = [{"Embarcador": e, f"FCL S{sem_b}": emb_b[e]} for e in solo_b]
+            df_b  = pd.DataFrame(rows_b).sort_values(f"FCL S{sem_b}", ascending=False) if rows_b else pd.DataFrame()
+
+            # Excel combinado (3 hojas)
+            buf_comp = io.BytesIO()
+            with pd.ExcelWriter(buf_comp, engine="openpyxl") as writer:
+                if not df_a.empty:  df_a.to_excel(writer,  sheet_name=f"Solo S{sem_a}", index=False)
+                if not df_ab.empty: df_ab.to_excel(writer, sheet_name="En ambas",       index=False)
+                if not df_b.empty:  df_b.to_excel(writer,  sheet_name=f"Nuevos S{sem_b}", index=False)
+            buf_comp.seek(0)
+            st.download_button(
+                f"⬇️ Excel — Comparación S{sem_a} vs S{sem_b}",
+                data=buf_comp,
+                file_name=f"PCH_Comparacion_S{sem_a}_S{sem_b}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+            def _html_table(df_src):
+                if df_src.empty:
+                    return "<i>Ninguno</i>"
+                return df_src.to_html(index=False, classes="print-table", border=0)
+
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.markdown(f"### ⚠️ Solo S{sem_a} — no cargaron S{sem_b}")
-                st.caption(f"{len(solo_a)} embarcadores")
-                rows_a = [{"Embarcador": e, f"FCL S{sem_a}": emb_a[e]} for e in solo_a]
-                if rows_a:
-                    df_a = pd.DataFrame(rows_a).sort_values(f"FCL S{sem_a}", ascending=False)
-                    st.dataframe(df_a, use_container_width=True, height=450, hide_index=True)
-                else:
-                    st.info("Ninguno")
+                st.markdown(f"### ⚠️ Solo S{sem_a}")
+                st.caption(f"{len(solo_a)} no cargaron S{sem_b}")
+                st.markdown(_html_table(df_a), unsafe_allow_html=True)
 
             with col2:
                 st.markdown(f"### ✅ En ambas semanas")
                 st.caption(f"{len(en_ambas)} embarcadores")
-                rows_ab = [{
-                    "Embarcador": e,
-                    f"FCL S{sem_a}": emb_a[e],
-                    f"FCL S{sem_b}": emb_b[e],
-                    "Δ FCL": emb_b[e] - emb_a[e],
-                } for e in en_ambas]
-                if rows_ab:
-                    df_ab = pd.DataFrame(rows_ab).sort_values(f"FCL S{sem_b}", ascending=False)
-                    st.dataframe(df_ab, use_container_width=True, height=450, hide_index=True)
-                else:
-                    st.info("Ninguno")
+                st.markdown(_html_table(df_ab), unsafe_allow_html=True)
 
             with col3:
                 st.markdown(f"### 🆕 Nuevos en S{sem_b}")
                 st.caption(f"{len(solo_b)} embarcadores")
-                rows_b = [{"Embarcador": e, f"FCL S{sem_b}": emb_b[e]} for e in solo_b]
-                if rows_b:
-                    df_b = pd.DataFrame(rows_b).sort_values(f"FCL S{sem_b}", ascending=False)
-                    st.dataframe(df_b, use_container_width=True, height=450, hide_index=True)
-                else:
-                    st.info("Ninguno")
+                st.markdown(_html_table(df_b), unsafe_allow_html=True)
 
         st.divider()
 
