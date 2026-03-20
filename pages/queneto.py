@@ -760,6 +760,21 @@ with tab5:
             rows_b = [{"Embarcador": e, f"FCL S{sem_b}": emb_b[e]} for e in solo_b]
             df_b  = pd.DataFrame(rows_b).sort_values(f"FCL S{sem_b}", ascending=False) if rows_b else pd.DataFrame()
 
+            # ── KPIs resumen (para que cuadren con Tab 1) ─────────────────────
+            fcl_a_total  = sum(emb_a.values())
+            fcl_b_total  = sum(emb_b.values())
+            embs_a_total = len(set_a)
+            embs_b_total = len(set_b)
+            ka1, ka2, kb1, kb2, kdelta = st.columns(5)
+            ka1.metric(f"FCL total S{sem_a}",       f"{fcl_a_total:,}")
+            ka2.metric(f"Embarcadores S{sem_a}",    f"{embs_a_total:,}")
+            kb1.metric(f"FCL total S{sem_b}",       f"{fcl_b_total:,}",  delta=f"{fcl_b_total - fcl_a_total:+,}")
+            kb2.metric(f"Embarcadores S{sem_b}",    f"{embs_b_total:,}", delta=f"{embs_b_total - embs_a_total:+,}")
+            kdelta.metric("Solo en S" + str(sem_a) + " / Solo en S" + str(sem_b),
+                          f"{len(solo_a)} / {len(solo_b)}", help="Embarcadores que NO repitieron / entraron nuevos")
+            st.caption(f"ℹ️ Los {embs_a_total} embarcadores de S{sem_a} se dividen en: {len(solo_a)} que no cargaron S{sem_b} + {len(en_ambas)} que sí cargaron ambas semanas")
+            st.divider()
+
             # Excel combinado (3 hojas)
             buf_comp = io.BytesIO()
             with pd.ExcelWriter(buf_comp, engine="openpyxl") as writer:
