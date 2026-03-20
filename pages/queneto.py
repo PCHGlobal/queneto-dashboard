@@ -391,7 +391,10 @@ with tab1:
                     fig.add_trace(go.Scatter(
                         x=_dc["semana"], y=_dc["avg_fot"],
                         name=f"CIRAD {_anio_c} (€/caja)",
-                        mode="lines+markers",
+                        mode="lines+markers+text",
+                        text=_dc["avg_fot"].apply(lambda v: f"{v:.2f}"),
+                        textposition="top center",
+                        textfont=dict(size=8),
                         yaxis="y2",
                         line=dict(dash="dash", width=2,
                                   color=_cirad_colors[_i % len(_cirad_colors)]),
