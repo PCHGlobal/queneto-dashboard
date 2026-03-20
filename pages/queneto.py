@@ -865,7 +865,8 @@ with tab5:
                     f"<td style='text-align:right;{_bg_green(row[c], col_max[c])}'>{row[c] if row[c] else ''}</td>"
                     for c in sem_cols
                 )
-                cells += f"<td style='text-align:right;font-weight:600;{_bg_blue(row[\"TOTAL\"])}'>{row['TOTAL']}</td>"
+                _tot = row["TOTAL"]
+                cells += f"<td style='text-align:right;font-weight:600;{_bg_blue(_tot)}'>{_tot}</td>"
                 mat_rows += f"<tr><td>{emb}</td>{cells}</tr>"
 
             st.markdown(f"""
