@@ -333,7 +333,7 @@ st.components.v1.html("""
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Gráficos", "📋 Tabla de Datos", "📈 Análisis Semanal", "🏢 Embarcadores"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Gráficos", "📋 Tabla de Datos", "📈 Análisis Semanal", "🏢 Embarcadores", "🏭 Productores"])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Gráficos
@@ -702,3 +702,105 @@ with tab4:
             use_container_width=True, height=400
         )
 
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — Productores (comparación semanal)
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab5:
+    if df.empty:
+        st.warning("Sin datos para los filtros seleccionados.")
+    else:
+        st.subheader("Comparación de Embarcadores entre Semanas")
+
+        semanas_disp = sorted(df["semana_src"].dropna().unique().astype(int))
+        if len(semanas_disp) < 1:
+            st.warning("No hay semanas en los datos filtrados.")
+        else:
+            c_a, c_b = st.columns(2)
+            sem_b_default = semanas_disp[-1]
+            sem_a_default = semanas_disp[-2] if len(semanas_disp) > 1 else semanas_disp[-1]
+            with c_a:
+                sem_a = st.selectbox("Semana A (base)", semanas_disp,
+                                     index=semanas_disp.index(sem_a_default), key="t5_sem_a")
+            with c_b:
+                sem_b = st.selectbox("Semana B (comparar)", semanas_disp,
+                                     index=semanas_disp.index(sem_b_default), key="t5_sem_b")
+
+            # Embarcadores por semana (con conteo FCL)
+            def _emb_sem(sem):
+                d = df[df["semana_src"] == sem].groupby("embarcador").size().reset_index(name="fcl")
+                return dict(zip(d["embarcador"], d["fcl"]))
+
+            emb_a = _emb_sem(sem_a)
+            emb_b = _emb_sem(sem_b)
+            set_a, set_b = set(emb_a), set(emb_b)
+
+            solo_a   = sorted(set_a - set_b)    # cargaron A pero NO B
+            en_ambas = sorted(set_a & set_b)    # cargaron en ambas
+            solo_b   = sorted(set_b - set_a)    # nuevos en B
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.markdown(f"### ⚠️ Solo S{sem_a} — no cargaron S{sem_b}")
+                st.caption(f"{len(solo_a)} embarcadores")
+                rows_a = [{"Embarcador": e, f"FCL S{sem_a}": emb_a[e]} for e in solo_a]
+                if rows_a:
+                    df_a = pd.DataFrame(rows_a).sort_values(f"FCL S{sem_a}", ascending=False)
+                    st.dataframe(df_a, use_container_width=True, height=450, hide_index=True)
+                else:
+                    st.info("Ninguno")
+
+            with col2:
+                st.markdown(f"### ✅ En ambas semanas")
+                st.caption(f"{len(en_ambas)} embarcadores")
+                rows_ab = [{
+                    "Embarcador": e,
+                    f"FCL S{sem_a}": emb_a[e],
+                    f"FCL S{sem_b}": emb_b[e],
+                    "Δ FCL": emb_b[e] - emb_a[e],
+                } for e in en_ambas]
+                if rows_ab:
+                    df_ab = pd.DataFrame(rows_ab).sort_values(f"FCL S{sem_b}", ascending=False)
+                    st.dataframe(df_ab, use_container_width=True, height=450, hide_index=True)
+                else:
+                    st.info("Ninguno")
+
+            with col3:
+                st.markdown(f"### 🆕 Nuevos en S{sem_b}")
+                st.caption(f"{len(solo_b)} embarcadores")
+                rows_b = [{"Embarcador": e, f"FCL S{sem_b}": emb_b[e]} for e in solo_b]
+                if rows_b:
+                    df_b = pd.DataFrame(rows_b).sort_values(f"FCL S{sem_b}", ascending=False)
+                    st.dataframe(df_b, use_container_width=True, height=450, hide_index=True)
+                else:
+                    st.info("Ninguno")
+
+        st.divider()
+
+        # Matriz embarcadores × semanas (top N)
+        st.subheader("Actividad semanal por Embarcador")
+        top_n_emb = st.slider("Top N embarcadores (por total FCL)", 10, 50, 20, key="t5_topn")
+        top_emb = (df.groupby("embarcador").size()
+                     .sort_values(ascending=False)
+                     .head(top_n_emb).index.tolist())
+        df_mat = (df[df["embarcador"].isin(top_emb)]
+                    .groupby(["embarcador", "semana_src"]).size()
+                    .reset_index(name="fcl"))
+        if not df_mat.empty:
+            pivot_mat = (df_mat.pivot(index="embarcador", columns="semana_src", values="fcl")
+                               .fillna(0).astype(int))
+            pivot_mat.columns = [f"S{int(c)}" for c in pivot_mat.columns]
+            pivot_mat["TOTAL"] = pivot_mat.sum(axis=1)
+            pivot_mat = pivot_mat.sort_values("TOTAL", ascending=False)
+            sem_cols = [c for c in pivot_mat.columns if c != "TOTAL"]
+            styled_mat = (pivot_mat.style
+                          .background_gradient(subset=sem_cols, cmap="YlGn", axis=None)
+                          .background_gradient(subset=["TOTAL"], cmap="Blues", axis=None))
+            st.dataframe(styled_mat, use_container_width=True, height=500)
+            buf_mat = io.BytesIO()
+            pivot_mat.to_excel(buf_mat, engine="openpyxl")
+            buf_mat.seek(0)
+            st.download_button("⬇️ Excel Matriz Embarcadores", data=buf_mat,
+                               file_name="PCH_Embarcadores_Semana.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
