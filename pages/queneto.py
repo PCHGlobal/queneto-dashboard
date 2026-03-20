@@ -775,12 +775,47 @@ with tab5:
             st.caption(f"ℹ️ Los {embs_a_total} embarcadores de S{sem_a} se dividen en: {len(solo_a)} que no cargaron S{sem_b} + {len(en_ambas)} que sí cargaron ambas semanas")
             st.divider()
 
-            # Excel combinado (3 hojas)
+            # Tabla unificada: todos los embarcadores con S_a y S_b
+            todos = sorted(set_a | set_b)
+            df_cmp = pd.DataFrame([{
+                "Embarcador":       e,
+                f"FCL S{sem_a}":   emb_a.get(e, 0),
+                f"FCL S{sem_b}":   emb_b.get(e, 0),
+                f"Δ FCL":          emb_b.get(e, 0) - emb_a.get(e, 0),
+            } for e in todos]).sort_values(f"FCL S{sem_a}", ascending=False)
+
+            # Colorear la columna Δ FCL en el HTML
+            def _color_delta(val):
+                if val > 0:   return "color:#1a7a3c; font-weight:600"
+                if val < 0:   return "color:#c0392b; font-weight:600"
+                return "color:#888"
+
+            html_rows = ""
+            for _, row in df_cmp.iterrows():
+                delta = int(row["Δ FCL"])
+                style = _color_delta(delta)
+                sign  = "+" if delta > 0 else ""
+                html_rows += (
+                    f"<tr><td>{row['Embarcador']}</td>"
+                    f"<td style='text-align:right'>{int(row[f'FCL S{sem_a}'])}</td>"
+                    f"<td style='text-align:right'>{int(row[f'FCL S{sem_b}'])}</td>"
+                    f"<td style='text-align:right;{style}'>{sign}{delta}</td></tr>"
+                )
+            html_table = f"""
+            <table class="print-table">
+              <thead><tr>
+                <th>Embarcador</th>
+                <th style="text-align:right">FCL S{sem_a}</th>
+                <th style="text-align:right">FCL S{sem_b}</th>
+                <th style="text-align:right">Δ FCL</th>
+              </tr></thead>
+              <tbody>{html_rows}</tbody>
+            </table>"""
+            st.markdown(html_table, unsafe_allow_html=True)
+
+            # Excel
             buf_comp = io.BytesIO()
-            with pd.ExcelWriter(buf_comp, engine="openpyxl") as writer:
-                if not df_a.empty:  df_a.to_excel(writer,  sheet_name=f"Solo S{sem_a}", index=False)
-                if not df_ab.empty: df_ab.to_excel(writer, sheet_name="En ambas",       index=False)
-                if not df_b.empty:  df_b.to_excel(writer,  sheet_name=f"Nuevos S{sem_b}", index=False)
+            df_cmp.to_excel(buf_comp, index=False, engine="openpyxl")
             buf_comp.seek(0)
             st.download_button(
                 f"⬇️ Excel — Comparación S{sem_a} vs S{sem_b}",
@@ -788,28 +823,6 @@ with tab5:
                 file_name=f"PCH_Comparacion_S{sem_a}_S{sem_b}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-
-            def _html_table(df_src):
-                if df_src.empty:
-                    return "<i>Ninguno</i>"
-                return df_src.to_html(index=False, classes="print-table", border=0)
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                st.markdown(f"### ⚠️ Solo S{sem_a}")
-                st.caption(f"{len(solo_a)} no cargaron S{sem_b}")
-                st.markdown(_html_table(df_a), unsafe_allow_html=True)
-
-            with col2:
-                st.markdown(f"### ✅ En ambas semanas")
-                st.caption(f"{len(en_ambas)} embarcadores")
-                st.markdown(_html_table(df_ab), unsafe_allow_html=True)
-
-            with col3:
-                st.markdown(f"### 🆕 Nuevos en S{sem_b}")
-                st.caption(f"{len(solo_b)} embarcadores")
-                st.markdown(_html_table(df_b), unsafe_allow_html=True)
 
         st.divider()
 
