@@ -196,7 +196,8 @@ def load_data(
         SELECT anio_src, {semana_col} AS semana_src, mes, fecha_zarpe,
                producto, variedad, continente, pais_destino, ciudad_destino,
                puerto, puerto_destino, naviera, embarcador, consignatorio,
-               transporte, sector, fcl, peso_neto, fob_total, fob_kg
+               transporte, sector, fcl, peso_neto, fob_total, fob_kg,
+               COALESCE(cantidad, 1) AS cantidad
         FROM reporte_pch
         WHERE {where}
         ORDER BY anio_src, {semana_col}
@@ -209,8 +210,9 @@ def load_data(
     conn.close()
     for col in ("anio_src", "semana_src"):
         df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
-    for col in ("fob_total", "fob_kg", "peso_neto"):
+    for col in ("fob_total", "fob_kg", "peso_neto", "cantidad"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["cantidad"] = df["cantidad"].fillna(1)
     return df
 
 # ── Cargar opciones ───────────────────────────────────────────────────────────
@@ -323,7 +325,7 @@ def kpi(col, label, value, sub=""):
             <div class="metric-sub">{sub}</div>
         </div>""", unsafe_allow_html=True)
 
-kpi(c1, "Contenedores (FCL)", f"{len(df):,}", "registros")
+kpi(c1, "Contenedores (FCL)", f"{df['cantidad'].sum():,.0f}", f"{len(df):,} registros")
 kpi(c2, "Peso Neto", f"{df['peso_neto'].sum()/1e6:,.1f} M kg", f"{df['peso_neto'].sum()/1e3:,.0f} ton")
 kpi(c3, "FOB Total", f"US$ {df['fob_total'].sum()/1e6:.1f} M", "millones USD")
 kpi(c4, "FOB / kg prom.", f"US$ {df['fob_kg'].mean():.3f}" if len(df) else "—", "USD por kg")
@@ -356,14 +358,16 @@ with tab1:
         _titulo_sem = "Contenedores por Semana y Producto" if _multi_prod else "Contenedores por Semana y Año"
         st.subheader(_titulo_sem)
         if _multi_prod:
-            df_sem = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
+            df_sem = df.groupby(["producto","anio_src","semana_src"])["cantidad"].sum().reset_index(name="cont")
+            df_sem["cont"] = df_sem["cont"].round().astype(int)
             df_sem["serie"] = df_sem["producto"].str.split().str[0] + " " + df_sem["anio_src"].astype(str)
             fig = px.line(df_sem, x="semana_src", y="cont",
                           color="serie", markers=True, text="cont",
                           labels={"semana_src":"Semana","cont":"Contenedores","serie":""},
                           color_discrete_sequence=COLORES)
         else:
-            df_sem = df.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
+            df_sem = df.groupby(["anio_src","semana_src"])["cantidad"].sum().reset_index(name="cont")
+            df_sem["cont"] = df_sem["cont"].round().astype(int)
             df_sem["anio_src"] = df_sem["anio_src"].astype(str)
             fig = px.line(df_sem, x="semana_src", y="cont", color="anio_src", markers=True,
                           text="cont",
@@ -410,12 +414,15 @@ with tab1:
                     )
                 )
         st.plotly_chart(fig, use_container_width=True)
+        _sem_label = "ETD (fecha de zarpe — salida de Perú)" if "ETD" in sel_semana_tipo else "ETA (fecha estimada de arribo — llegada a destino)"
+        st.caption(f"📌 Semana por **{_sem_label}** · Contenedores = unidades físicas (un contenedor compartido entre variedades cuenta como 1)")
 
         g3, g4 = st.columns(2)
 
         with g3:
             st.subheader("Top Países Destino")
-            df_p = (df.groupby("pais_destino").size().reset_index(name="cont")
+            df_p = (df.groupby("pais_destino")["cantidad"].sum().reset_index(name="cont")
+                      .assign(cont=lambda x: x["cont"].round().astype(int))
                       .sort_values("cont", ascending=True).tail(15))
             fig3 = px.bar(df_p, x="cont", y="pais_destino", orientation="h",
                           labels={"pais_destino":"","cont":"Contenedores"},
@@ -426,7 +433,8 @@ with tab1:
 
         with g4:
             st.subheader("Top Navieras")
-            df_nav = (df.groupby("naviera").size().reset_index(name="cont")
+            df_nav = (df.groupby("naviera")["cantidad"].sum().reset_index(name="cont")
+                        .assign(cont=lambda x: x["cont"].round().astype(int))
                         .sort_values("cont", ascending=True).tail(15))
             fig4 = px.bar(df_nav, x="cont", y="naviera", orientation="h",
                           labels={"naviera":"","cont":"Contenedores"},
@@ -463,7 +471,8 @@ with tab1:
         g5, g6 = st.columns(2)
         with g5:
             st.subheader("Distribución por Producto")
-            df_prod = df.groupby("producto").size().reset_index(name="cont")
+            df_prod = df.groupby("producto")["cantidad"].sum().reset_index(name="cont")
+            df_prod["cont"] = df_prod["cont"].round().astype(int)
             fig6 = px.pie(df_prod, names="producto", values="cont",
                           color_discrete_sequence=COLORES, hole=0.35)
             fig6.update_layout(height=320)
@@ -471,7 +480,8 @@ with tab1:
 
         with g6:
             st.subheader("Contenedores por Puerto Origen")
-            df_pto = (df.groupby("puerto").size().reset_index(name="cont")
+            df_pto = (df.groupby("puerto")["cantidad"].sum().reset_index(name="cont")
+                        .assign(cont=lambda x: x["cont"].round().astype(int))
                         .sort_values("cont", ascending=True).tail(10))
             fig7 = px.bar(df_pto, x="cont", y="puerto", orientation="h",
                           labels={"puerto":"","cont":"Contenedores"},
@@ -571,7 +581,8 @@ with tab3:
         productos_t3 = sorted(df["producto"].unique()) if _multi_prod_t3 else [None]
 
         def _make_pivot(df_src):
-            dp = df_src.groupby(["anio_src","semana_src"]).size().reset_index(name="cont")
+            dp = df_src.groupby(["anio_src","semana_src"])["cantidad"].sum().reset_index(name="cont")
+            dp["cont"] = dp["cont"].round().astype(int)
             pv = (dp.pivot(index="semana_src", columns="anio_src", values="cont")
                     .reindex(range(1,53)).fillna(0).astype(int))
             pv.index.name = "Semana"
@@ -581,7 +592,8 @@ with tab3:
 
         if _multi_prod_t3:
             # Tabla combinada con columnas por producto+año
-            df_piv_all = df.groupby(["producto","anio_src","semana_src"]).size().reset_index(name="cont")
+            df_piv_all = df.groupby(["producto","anio_src","semana_src"])["cantidad"].sum().reset_index(name="cont")
+            df_piv_all["cont"] = df_piv_all["cont"].round().astype(int)
             df_piv_all["col"] = df_piv_all["producto"].str.split().str[0] + " " + df_piv_all["anio_src"].astype(str)
             pivot_wide = (df_piv_all.pivot_table(index="semana_src", columns="col", values="cont", aggfunc="sum")
                                     .reindex(range(1,53)).fillna(0).astype(int))
@@ -652,12 +664,13 @@ with tab4:
         st.subheader("Ranking de Embarcadores")
 
         df_emb = (df.groupby("embarcador")
-                    .agg(Contenedores=("fcl","count"),
+                    .agg(Contenedores=("cantidad","sum"),
                          Peso_kg=("peso_neto","sum"),
                          FOB_USD=("fob_total","sum"),
                          FOB_kg_prom=("fob_kg","mean"))
                     .reset_index()
                     .sort_values("Contenedores", ascending=False))
+        df_emb["Contenedores"] = df_emb["Contenedores"].round().astype(int)
         df_emb["FOB_M"] = df_emb["FOB_USD"] / 1e6
         df_emb["Peso_M_kg"] = df_emb["Peso_kg"] / 1e6
         df_emb["Market Share %"] = (df_emb["Contenedores"] / df_emb["Contenedores"].sum() * 100).round(2)
@@ -686,7 +699,8 @@ with tab4:
         # Evolución de top 5 embarcadores por año
         top5 = df_emb.head(5)["embarcador"].tolist()
         df_top5 = (df[df["embarcador"].isin(top5)]
-                     .groupby(["anio_src","embarcador"]).size().reset_index(name="cont"))
+                     .groupby(["anio_src","embarcador"])["cantidad"].sum().reset_index(name="cont"))
+        df_top5["cont"] = df_top5["cont"].round().astype(int)
         df_top5["anio_src"] = df_top5["anio_src"].astype(str)
         años_orden = sorted(df_top5["anio_src"].unique())
         fig3 = px.line(df_top5, x="anio_src", y="cont", color="embarcador",
@@ -740,7 +754,8 @@ with tab5:
 
             # Embarcadores por semana (con conteo FCL)
             def _emb_sem(sem):
-                d = df[df["semana_src"] == sem].groupby("embarcador").size().reset_index(name="fcl")
+                d = df[df["semana_src"] == sem].groupby("embarcador")["cantidad"].sum().reset_index(name="fcl")
+                d["fcl"] = d["fcl"].round().astype(int)
                 return dict(zip(d["embarcador"], d["fcl"]))
 
             emb_a = _emb_sem(sem_a)
@@ -832,12 +847,13 @@ with tab5:
         # Matriz embarcadores × semanas (top N)
         st.subheader("Actividad semanal por Embarcador")
         top_n_emb = st.slider("Top N embarcadores (por total FCL)", 10, 50, 20, key="t5_topn")
-        top_emb = (df.groupby("embarcador").size()
+        top_emb = (df.groupby("embarcador")["cantidad"].sum()
                      .sort_values(ascending=False)
                      .head(top_n_emb).index.tolist())
         df_mat = (df[df["embarcador"].isin(top_emb)]
-                    .groupby(["embarcador", "semana_src"]).size()
+                    .groupby(["embarcador", "semana_src"])["cantidad"].sum()
                     .reset_index(name="fcl"))
+        df_mat["fcl"] = df_mat["fcl"].round().astype(int)
         if not df_mat.empty:
             pivot_mat = (df_mat.pivot(index="embarcador", columns="semana_src", values="fcl")
                                .fillna(0).astype(int))
@@ -884,3 +900,4 @@ with tab5:
             st.download_button("⬇️ Excel Matriz Embarcadores", data=buf_mat,
                                file_name="PCH_Embarcadores_Semana.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
