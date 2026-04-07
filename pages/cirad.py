@@ -589,7 +589,7 @@ def color_fot(val):
 
 fmt = {c: "€{:.2f}" for c in pivot.columns}
 st.dataframe(
-    pivot.style.format(fmt, na_rep="—").applymap(color_fot),
+    pivot.style.format(fmt, na_rep="—").map(color_fot),
     use_container_width=True,
     height=600
 )
