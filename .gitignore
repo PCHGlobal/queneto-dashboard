@@ -5,3 +5,5 @@ ERRORES.pdf
 __pycache__/
 *.pyc
 .env
+.venv/
+.streamlit/secrets.toml

@@ -1,3 +1,8 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from auth_check import require_auth
+require_auth()
+
 """
 PCH Global — Queneto Dashboard
 Explorador de exportaciones peruanas. Filtros aplicados en SQL (server-side).

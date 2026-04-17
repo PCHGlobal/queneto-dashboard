@@ -1,3 +1,8 @@
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from auth_check import require_auth
+require_auth()
+
 """
 PCH Global — CIRAD
 Reporte semanal de precios FOT Palta Hass en Europa.
