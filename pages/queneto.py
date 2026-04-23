@@ -415,6 +415,7 @@ with tab1:
                         side="right",
                         showgrid=False,
                         tickformat=".2f",
+                        rangemode="tozero",
                     )
                 )
         st.plotly_chart(fig, use_container_width=True)
