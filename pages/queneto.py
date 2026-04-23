@@ -384,10 +384,9 @@ with tab1:
         fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=420,
                           yaxis=dict(range=[0, _y_max]))
 
-        # CIRAD overlay: solo si ETA y producto es palta
+        # CIRAD overlay: si producto es palta (ETD o ETA)
         _show_cirad = (
-            "ETA" in sel_semana_tipo
-            and bool(sel_producto)
+            bool(sel_producto)
             and all("palta" in p.lower() for p in sel_producto)
         )
         if _show_cirad:
