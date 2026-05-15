@@ -384,10 +384,11 @@ with tab1:
         fig.update_layout(plot_bgcolor="#FAFAFA", paper_bgcolor="#FAFAFA", height=420,
                           yaxis=dict(range=[0, _y_max]))
 
-        # CIRAD overlay: si producto es palta (ETD o ETA)
+        # CIRAD overlay: solo si producto es palta Y continente es exclusivamente EUROPE
         _show_cirad = (
             bool(sel_producto)
             and all("palta" in p.lower() for p in sel_producto)
+            and sel_continente == ["EUROPE"]
         )
         if _show_cirad:
             _cirad_años = tuple(sorted(int(a) for a in sel_año)) if sel_año else ()
